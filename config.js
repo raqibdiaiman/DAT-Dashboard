@@ -1,16 +1,9 @@
-// Shared database settings for the DAT Project Monitoring Dashboard.
-//
-// Leave as-is to run in standalone mode (changes saved in each person's browser only).
-// To let your whole team share and edit the same data, create a free Firebase project
-// and paste its web app config below. Step-by-step guide: README.md → "Sharing data with your team".
-//
-// Firebase console → Project settings (gear icon) → Your apps → SDK setup and configuration → Config
-
-window.DAT_FIREBASE_CONFIG = {
-  apiKey: "PASTE_API_KEY_HERE",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
-};
+   window.DAT_FIREBASE_CONFIG = {
+apiKey: "AIzaSyDU3L28HT2x76iMtNuMoxcRzDVxOfQqILM",
+  authDomain: "dat-project-tracker.firebaseapp.com",
+  projectId: "dat-project-tracker",
+  storageBucket: "dat-project-tracker.firebasestorage.app",
+  messagingSenderId: "387088751348",
+  appId: "1:387088751348:web:2febed5b6e6d253f2bdca1",
+  measurementId: "G-BVVBMRC7L0"
+   };
