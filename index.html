@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DAT Project Monitoring Dashboard</title>
-     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2314223D'/%3E%3Crect x='10' y='46' width='44' height='5' rx='2.5' fill='%2376A9F5'/%3E%3Ctext x='32' y='38' font-family='Arial,Helvetica,sans-serif' font-size='23' font-weight='700' fill='white' text-anchor='middle'%3EDAT%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2314223D'/%3E%3Crect x='10' y='46' width='44' height='5' rx='2.5' fill='%2376A9F5'/%3E%3Ctext x='32' y='38' font-family='Arial,Helvetica,sans-serif' font-size='23' font-weight='700' fill='white' text-anchor='middle'%3EDAT%3C/text%3E%3C/svg%3E">
 <script src="config.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -143,6 +143,16 @@ table.t{width:100%;border-collapse:collapse;font-size:14px}
 .t th:first-child,.t td:first-child{padding-left:18px}
 .t th:last-child,.t td:last-child{padding-right:18px}
 .t tr.click{cursor:pointer}
+.thsort{background:none;border:0;padding:0;font:inherit;color:inherit;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.thsort:hover{color:var(--ink)}
+.t th[aria-sort] .thsort{color:var(--ink)}
+.thsort .arr{font-size:9px;opacity:.45;line-height:1}
+.t th[aria-sort] .thsort .arr{opacity:1;color:var(--accent)}
+.tbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 18px 12px}
+.tbar .inp{width:auto;min-width:140px;padding:6px 9px;font-size:13.5px}
+.tbar .q{flex:1 1 220px;max-width:340px}
+.tbar .cnt{font-size:12.5px;color:var(--faint);margin-left:auto}
+@media (max-width:600px){.tbar .inp{flex:1 1 45%;min-width:0;max-width:none}.tbar .cnt{margin-left:0}}
 .t tr.click:hover td{background:var(--surface-2)}
 .t .nowrap{white-space:nowrap}
 .pname{font-weight:600;background:none;border:0;padding:0;text-align:left;color:var(--ink)}
@@ -166,6 +176,10 @@ div.warn{display:flex;}
 .prog span{font-size:12.5px;font-weight:600;min-width:38px;text-align:right}
 select.ssel{appearance:none;-webkit-appearance:none;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:color-mix(in srgb,var(--c) 11%,var(--surface)) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' fill='none' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center;color:var(--c);font-weight:600;font-size:12.5px;border-radius:20px;padding:3px 26px 3px 11px}
 .pin{width:64px;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:var(--surface);font-size:13px;text-align:right}
+.sch{display:inline-flex;flex-direction:column;gap:1px;line-height:1.3}
+.sch b{font-size:12.5px;font-weight:600;color:var(--c,var(--muted));white-space:nowrap}
+.sch small{font-size:11.5px;color:var(--faint);white-space:nowrap}
+.sch-early{--c:var(--s-done)}.sch-late{--c:var(--s-hold)}.sch-overdue{--c:var(--s-late)}.sch-soon{--c:var(--s-hold)}.sch-ontrack{--c:var(--muted)}.sch-done{--c:var(--s-done)}
 .status-note{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
 .status-note .lab{font-size:12.5px;color:var(--muted);margin-right:4px}
 .sysw{display:inline-flex;gap:6px;align-items:center;background:color-mix(in srgb,var(--s-late) 9%,var(--surface));border:1px solid color-mix(in srgb,var(--s-late) 30%,var(--line));color:var(--s-late);padding:3px 10px;border-radius:7px;font-size:13px;font-weight:600}
@@ -353,7 +367,7 @@ const TABLES={projects:'mainProjects',subs:'subProjects',issues:'projectIssues'}
 const S={
   projects:[],subs:[],issues:[],loaded:{projects:false,subs:false,issues:false},mode:null,
   view:'dashboard',
-  dash:{chart:'donut',focus:''},
+  dash:{chart:'donut',focus:'',q:'',pic:'',deadline:'',sort:'',dir:'asc'},
   gantt:{preset:'all',from:'',to:'',status:'',pic:''},
   pchart:{},moreQ:''
 };
@@ -394,13 +408,16 @@ async function connectFirebase(){
     return firebase.firestore();
   }catch(e){toast('Couldn’t connect to the shared database. Check config.js and your internet connection.',true);return null}
 }
+async function fetchSample(){
+  for(const u of ['data/sample-data.json','sample-data.json']){try{const r=await fetch(u,{cache:'no-store'});if(r.ok)return await r.json()}catch(e){}}
+  return null;
+}
 async function seedIfEmpty(db){
   try{
     const meta=db.collection('meta').doc('seed');const m=await meta.get();if(m.exists)return;
     const firsts=await Promise.all(Object.values(TABLES).map(t=>db.collection(t).limit(1).get()));
     if(firsts.some(q=>!q.empty)){await meta.set({seeded:true,at:TODAY});return}
-    const r=await fetch('data/sample-data.json',{cache:'no-store'});if(!r.ok){await meta.set({seeded:true,at:TODAY});return}
-    const d=await r.json();const batch=db.batch();batch.set(meta,{seeded:true,at:TODAY});
+    const d=await fetchSample();if(!d){await meta.set({seeded:true,at:TODAY});return}const batch=db.batch();batch.set(meta,{seeded:true,at:TODAY});
     for(const k of ['projects','subs','issues'])for(const x of d[k]||[]){const {id,...body}=x;batch.set(db.collection(TABLES[k]).doc(id),body)}
     await batch.commit();
   }catch(e){console.warn('Sample data not loaded',e)}
@@ -420,7 +437,7 @@ async function initData(){
   }else{
     S.mode='local';
     let d=null;try{d=JSON.parse(lsGet(LS_DATA,'null'))}catch(e){}
-    if(!d){try{const r=await fetch('data/sample-data.json',{cache:'no-store'});if(r.ok){d=await r.json();lsSet(LS_DATA,JSON.stringify(d))}}catch(e){}}
+    if(!d){d=await fetchSample();if(d)lsSet(LS_DATA,JSON.stringify(d))}
     if(d){S.projects=d.projects||[];S.subs=d.subs||[];S.issues=d.issues||[]}
     S.loaded={projects:true,subs:true,issues:true};refresh();
   }
@@ -532,12 +549,48 @@ function renderMorePanel(focus){
 /* =========================================================
    DASHBOARD
    ========================================================= */
+/* ---------- table sorting & filtering helpers ---------- */
+function getPC(pid){const d={type:'bar',focus:'',q:'',pic:'',deadline:'',sort:'',dir:'asc'};S.pchart[pid]={...d,...(S.pchart[pid]||{})};return S.pchart[pid]}
+function stateFor(path){if(path.startsWith('p:')){const pid=path.slice(2);return getPC(pid)}return S[path]}
+function sortTh(label,key,st,path,style=''){const on=st.sort===key;return `<th ${style?`style="${style}"`:''} ${on?`aria-sort="${st.dir==='asc'?'ascending':'descending'}"`:''}><button class="thsort" data-action="tsort" data-path="${path}" data-k="${key}" title="Sort by ${label.toLowerCase()}">${label}<span class="arr">${on?(st.dir==='asc'?'▲':'▼'):'▲▼'}</span></button></th>`}
+function applySort(rows,st,getters){
+  if(!st.sort||!getters[st.sort])return rows;const g=getters[st.sort];const m=st.dir==='desc'?-1:1;
+  return rows.slice().sort((a,b)=>{let x=g(a),y=g(b);const ex=x===''||x==null,ey=y===''||y==null;if(ex||ey)return ex&&ey?0:ex?1:-1;if(typeof x==='string'){x=x.toLowerCase();y=String(y).toLowerCase()}return (x<y?-1:x>y?1:0)*m});
+}
+/* Schedule: expected completion (due date) vs actual completion date.
+   n = days behind schedule (negative = ahead / days left). */
+function schedule(due,actual,prog,status){
+  const done=status==='Completed'||prog>=100;
+  if(done){
+    if(!actual)return {k:'done',txt:'Completed',sub:'Actual date not recorded',n:null};
+    if(!due)return {k:'early',txt:'Completed',sub:fmt(actual),n:null};
+    const d=diffDays(due,actual);
+    if(d<0)return {k:'early',txt:`${plural(-d,'day')} early`,sub:`Completed ${fmt(actual)}`,n:d};
+    if(d===0)return {k:'early',txt:'On time',sub:`Completed ${fmt(actual)}`,n:0};
+    return {k:'late',txt:`${plural(d,'day')} late`,sub:`Completed ${fmt(actual)}`,n:d};
+  }
+  if(!due)return {k:'ontrack',txt:'No due date',sub:'',n:null};
+  const r=diffDays(TODAY,due);
+  if(r<0)return {k:'overdue',txt:`Overdue by ${plural(-r,'day')}`,sub:`Was due ${fmt(due)}`,n:-r};
+  if(r===0)return {k:'soon',txt:'Due today',sub:'',n:0};
+  return {k:r<=7?'soon':'ontrack',txt:`${plural(r,'day')} left`,sub:`Due ${fmt(due)}`,n:-r};
+}
+const schedHTML=(sc,full=true)=>{const sub=full||sc.k==='done'?sc.sub:'';return `<span class="sch sch-${sc.k}"><b>${sc.k==='overdue'?ICON.warn:''}${esc(sc.txt)}</b>${sub?`<small>${esc(sub)}</small>`:''}</span>`};
+const schKey=k=>k==='soon'?'ontrack':k;
+const projSched=(p)=>schedule(p.dueDate,p.actualCompletionDate,p.status==='Completed'?100:0,p.status);
+const subSched=s=>schedule(s.dueDate,s.actualCompletionDate,Number(s.progress)||0,s.status);
+const DEADLINE_OPTS=[['','All schedules'],['overdue','Overdue'],['ontrack','In progress, on track'],['early','Completed on time / early'],['late','Completed late'],['done','Completed, no actual date']];
+const selOpts=(pairs,val)=>pairs.map(([v,l])=>`<option value="${esc(v)}" ${v===val?'selected':''}>${esc(l)}</option>`).join('');
 function renderDashboard(){
   const ps=activeProjects();const rows=ps.map(p=>({p,prog:progressOf(p),od:projOverdue(p)}));
   const n=rows.length;const c=countBy(rows,r=>r.p.status);
   const avg=n?rows.reduce((a,r)=>a+r.prog,0)/n:0;
   const extraLate=rows.filter(r=>r.od&&r.p.status!=='Delayed').length;
-  const f=S.dash.focus;const shown=f?rows.filter(r=>r.p.status===f):rows;
+  const f=S.dash.focus;const D=S.dash;const dq=D.q.trim().toLowerCase();
+  let shown=rows.filter(r=>(!f||r.p.status===f)&&(!D.pic||r.p.pic===D.pic)&&(!D.deadline||schKey(projSched(r.p,r.prog).k)===D.deadline)
+    &&(!dq||[r.p.name,r.p.pic,r.p.description].join(' ').toLowerCase().includes(dq)));
+  shown=applySort(shown,D,{name:r=>r.p.name,start:r=>r.p.startDate,due:r=>r.p.dueDate,pic:r=>r.p.pic,progress:r=>r.prog,status:r=>STATUSES.indexOf(r.p.status),deadline:r=>projSched(r.p,r.prog).n,actual:r=>r.p.actualCompletionDate||''});
+  const dFiltered=!!(f||D.q||D.pic||D.deadline);
   const kpi=(l,v,sub,k,st,warn)=>`<${st?'button':'div'} class="kpi" style="--k:${k}" ${st?`data-action="dash-focus" data-status="${st}" aria-pressed="${f===st}" title="Show ${l.toLowerCase()} projects"`:''}><span class="l">${l}</span><span class="n">${v}</span><span class="pc ${warn?'w':''}">${sub}</span></${st?'button':'div'}>`;
   // upcoming & overdue sub-projects across projects
   const soon=[];for(const p of ps)for(const s of subsOf(p.id)){if(s.status==='Completed'||Number(s.progress)>=100)continue;const dd=diffDays(TODAY,s.dueDate||'9999-12-31');if(s.dueDate&&dd<=14)soon.push({p,s,dd})}
@@ -563,10 +616,18 @@ function renderDashboard(){
     </section>
   </div>
   <section class="panel flush">
-    <div class="panel-h"><h2>Project summary</h2>${f?`<span style="display:flex;gap:8px;align-items:center"><span class="meta">Showing ${esc(f)}</span><button class="btn sm" data-action="dash-focus" data-status="${esc(f)}">Show all</button></span>`:`<span class="meta">Select a project to open its tab</span>`}</div>
-    ${shown.length?`<div class="tw"><table class="t"><thead><tr><th>Project</th><th>Start date</th><th>Due date</th><th>PIC</th><th>Progress</th><th>Reported status</th><th>Deadline check</th></tr></thead><tbody>
-    ${shown.map(r=>`<tr class="click" data-nav="p:${r.p.id}"><td style="min-width:220px"><button class="pname" data-nav="p:${r.p.id}">${esc(r.p.name)}</button><div class="small">${plural(subsOf(r.p.id).length,'sub-project')}${openIssuesOf(r.p.id).length?` · <span style="color:var(--s-late)">${plural(openIssuesOf(r.p.id).length,'open issue')}</span>`:''}</div></td><td class="nowrap">${fmt(r.p.startDate)}</td><td class="nowrap">${fmt(r.p.dueDate)}</td><td class="nowrap">${esc(r.p.pic)}</td><td style="min-width:150px">${progBar(r.prog,r.p.status)}</td><td>${badge(r.p.status)}</td><td>${r.od?warnTxt(r.od):`<span class="small">${r.prog>=100||r.p.status==='Completed'?'Done':'On track'}</span>`}</td></tr>`).join('')}
-    </tbody></table></div>`:emptyState(`No ${esc(f).toLowerCase()} projects`,'',`<button class="btn" data-action="dash-focus" data-status="${esc(f)}">Show all projects</button>`)}
+    <div class="panel-h"><h2>Project summary</h2><span class="meta">Select a project to open its tab</span></div>
+    <div class="tbar" role="search" aria-label="Filter projects">
+      <input type="search" class="inp q" id="ds-q" data-set="dash.q" placeholder="Search project, PIC or description" value="${esc(D.q)}" aria-label="Search projects">
+      <select class="inp" id="ds-st" data-set="dash.focus" aria-label="Status">${opts(STATUSES,f,'All statuses')}</select>
+      <select class="inp" id="ds-pic" data-set="dash.pic" aria-label="PIC">${opts(uniq(rows.map(r=>r.p.pic)),D.pic,'All PICs')}</select>
+      <select class="inp" id="ds-dl" data-set="dash.deadline" aria-label="Deadline">${selOpts(DEADLINE_OPTS,D.deadline)}</select>
+      ${dFiltered||D.sort?`<button class="btn sm ghost" data-action="tclear" data-path="dash">Clear</button>`:''}
+      <span class="cnt">${shown.length} of ${plural(rows.length,'project')}</span>
+    </div>
+    ${shown.length?`<div class="tw"><table class="t"><thead><tr>${sortTh('Project','name',D,'dash')}${sortTh('Start date','start',D,'dash')}${sortTh('Expected completion','due',D,'dash')}${sortTh('Actual completion','actual',D,'dash')}${sortTh('PIC','pic',D,'dash')}${sortTh('Progress','progress',D,'dash')}${sortTh('Reported status','status',D,'dash')}${sortTh('Schedule','deadline',D,'dash')}</tr></thead><tbody>
+    ${shown.map(r=>`<tr class="click" data-nav="p:${r.p.id}"><td style="min-width:220px"><button class="pname" data-nav="p:${r.p.id}">${esc(r.p.name)}</button><div class="small">${plural(subsOf(r.p.id).length,'sub-project')}${openIssuesOf(r.p.id).length?` · <span style="color:var(--s-late)">${plural(openIssuesOf(r.p.id).length,'open issue')}</span>`:''}</div></td><td class="nowrap">${fmt(r.p.startDate)}</td><td class="nowrap">${fmt(r.p.dueDate)}</td><td class="nowrap">${fmt(r.p.actualCompletionDate)}</td><td class="nowrap">${esc(r.p.pic)}</td><td style="min-width:150px">${progBar(r.prog,r.p.status)}</td><td>${badge(r.p.status)}</td><td>${schedHTML(projSched(r.p),false)}</td></tr>`).join('')}
+    </tbody></table></div>`:emptyState('No projects match these filters','Try another search or clear the filters.',`<button class="btn" data-action="tclear" data-path="dash">Clear filters</button>`)}
   </section>`}`;
 }
 function portfolioText(){
@@ -638,9 +699,12 @@ function renderProject(p){
   const ss=subsOf(p.id);const prog=progressOf(p);const od=projOverdue(p);
   const c=countBy(ss,s=>s.status);const iss=issuesOf(p.id).sort((a,b)=>(a.status==='Resolved')-(b.status==='Resolved')||PRIORITIES.indexOf(b.priority)-PRIORITIES.indexOf(a.priority));
   const days=p.dueDate?diffDays(TODAY,p.dueDate):null;
-  const ch=S.pchart[p.id]||{type:'bar',focus:''};
+  const ch=getPC(p.id);const PP='p:'+p.id;const sq=ch.q.trim().toLowerCase();
   const lateSubs=ss.filter(s=>subOverdue(s)&&s.status!=='Delayed').length;
-  const shownSubs=ch.focus?ss.filter(s=>s.status===ch.focus):ss;
+  let shownSubs=ss.filter(s=>(!ch.focus||s.status===ch.focus)&&(!ch.pic||s.pic===ch.pic)&&(!ch.deadline||schKey(subSched(s).k)===ch.deadline)
+    &&(!sq||[s.name,s.description,s.pic,s.issues,s.remarks].join(' ').toLowerCase().includes(sq)));
+  shownSubs=applySort(shownSubs,ch,{no:s=>ss.indexOf(s),name:s=>s.name,start:s=>s.startDate,due:s=>s.dueDate,pic:s=>s.pic,progress:s=>Number(s.progress)||0,status:s=>STATUSES.indexOf(s.status),issues:s=>openIssuesOf(p.id).filter(i=>i.subProjectId===s.id).length,actual:s=>s.actualCompletionDate||'',sched:s=>subSched(s).n});
+  const sFiltered=!!(ch.focus||ch.q||ch.pic||ch.deadline);
   const kpi=(l,v,sub,k,st,warn)=>`<${st?'button':'div'} class="kpi" style="--k:${k}" ${st?`data-action="p-focus" data-id="${p.id}" data-status="${st}" aria-pressed="${ch.focus===st}"`:''}><span class="l">${l}</span><span class="n">${v}</span>${sub?`<span class="pc ${warn?'w':''}">${sub}</span>`:''}</${st?'button':'div'}>`;
   const sum=p.summary||{};
   return `
@@ -653,8 +717,9 @@ function renderProject(p){
       <dl class="info">
         <div><dt>Main PIC</dt><dd>${esc(p.pic||'—')}</dd></div>
         <div><dt>Start date</dt><dd>${fmt(p.startDate)}</dd></div>
-        <div><dt>Due date</dt><dd>${fmt(p.dueDate)}</dd></div>
-        <div><dt>Days remaining</dt><dd>${p.status==='Completed'?'Completed':days===null?'—':days>=0?plural(days,'day'):`<span style="color:var(--s-late)">Overdue by ${plural(-days,'day')}</span>`}</dd></div>
+        <div><dt>Expected completion</dt><dd>${fmt(p.dueDate)}</dd></div>
+        <div><dt>Actual completion</dt><dd>${fmt(p.actualCompletionDate)}</dd></div>
+        <div><dt>Schedule</dt><dd>${schedHTML(projSched(p,prog))}</dd></div>
         <div><dt>Last updated</dt><dd>${fmt(lastUpdatedOf(p))}</dd></div>
       </dl>
       <div class="acts"><button class="btn primary" data-action="edit-project" data-id="${p.id}">${ICON.edit}Edit project</button><button class="btn" data-action="archive" data-id="${p.id}">${ICON.box}${p.archived?'Restore':'Archive'}</button><button class="btn danger" data-action="delete-project" data-id="${p.id}">${ICON.trash}Delete</button></div>
@@ -677,13 +742,21 @@ function renderProject(p){
       <div class="objgrid"><div><h3>Overall objective</h3><p>${esc(p.objective)||'<span class="small">Not recorded.</span>'}</p></div><div><h3>Expected benefit</h3><p>${esc(p.benefit)||'<span class="small">Not recorded.</span>'}</p></div>${p.remarks?`<div><h3>Remarks</h3><p>${esc(p.remarks)}</p></div>`:''}</div></section>
   </div>
   <section class="panel flush">
-    <div class="panel-h"><h2>Sub-projects and workstreams</h2><span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${ch.focus?`<span class="meta">Showing ${esc(ch.focus)}</span><button class="btn sm" data-action="p-focus" data-id="${p.id}" data-status="${esc(ch.focus)}">Show all</button>`:''}<button class="btn primary sm" data-action="sub-modal" data-project="${p.id}">${ICON.plus}Add sub-project</button></span></div>
-    ${!ss.length?emptyState('No sub-projects yet','Break the project into workstreams. Overall progress is calculated from them.',`<button class="btn primary" data-action="sub-modal" data-project="${p.id}">${ICON.plus}Add sub-project</button>`):!shownSubs.length?emptyState(`No ${esc(ch.focus).toLowerCase()} sub-projects`,''):`
-    <div class="tw" style="margin-top:12px"><table class="t"><thead><tr><th>No.</th><th>Sub-project / workstream</th><th>Start date</th><th>Due date</th><th>PIC</th><th>Progress</th><th>Status</th><th>Issues / challenges</th><th>Action</th></tr></thead><tbody>
+    <div class="panel-h"><h2>Sub-projects and workstreams</h2><button class="btn primary sm" data-action="sub-modal" data-project="${p.id}">${ICON.plus}Add sub-project</button></div>
+    ${ss.length?`<div class="tbar" role="search" aria-label="Filter sub-projects">
+      <input type="search" class="inp q" id="ss-q-${p.id}" data-set="${PP}.q" placeholder="Search sub-project, PIC or issue" value="${esc(ch.q)}" aria-label="Search sub-projects">
+      <select class="inp" id="ss-st-${p.id}" data-set="${PP}.focus" aria-label="Status">${opts(STATUSES,ch.focus,'All statuses')}</select>
+      <select class="inp" id="ss-pic-${p.id}" data-set="${PP}.pic" aria-label="PIC">${opts(uniq(ss.map(s=>s.pic)),ch.pic,'All PICs')}</select>
+      <select class="inp" id="ss-dl-${p.id}" data-set="${PP}.deadline" aria-label="Deadline">${selOpts(DEADLINE_OPTS,ch.deadline)}</select>
+      ${sFiltered||ch.sort?`<button class="btn sm ghost" data-action="tclear" data-path="${PP}">Clear</button>`:''}
+      <span class="cnt">${shownSubs.length} of ${plural(ss.length,'sub-project')}</span>
+    </div>`:''}
+    ${!ss.length?emptyState('No sub-projects yet','Break the project into workstreams. Overall progress is calculated from them.',`<button class="btn primary" data-action="sub-modal" data-project="${p.id}">${ICON.plus}Add sub-project</button>`):!shownSubs.length?emptyState('No sub-projects match these filters','Try another search or clear the filters.',`<button class="btn" data-action="tclear" data-path="${PP}">Clear filters</button>`):`
+    <div class="tw"><table class="t"><thead><tr>${sortTh('No.','no',ch,PP)}${sortTh('Sub-project / workstream','name',ch,PP)}${sortTh('Start date','start',ch,PP)}${sortTh('Expected completion','due',ch,PP)}${sortTh('Actual completion','actual',ch,PP)}${sortTh('Schedule','sched',ch,PP)}${sortTh('PIC','pic',ch,PP)}${sortTh('Progress','progress',ch,PP)}${sortTh('Status','status',ch,PP)}${sortTh('Issues / challenges','issues',ch,PP)}<th>Action</th></tr></thead><tbody>
     ${shownSubs.map(s=>{const sod=subOverdue(s);const oi=openIssuesOf(p.id).filter(i=>i.subProjectId===s.id).length;return `<tr>
       <td class="small">${ss.indexOf(s)+1}</td>
-      <td style="min-width:200px"><button class="pname" data-action="sub-view" data-id="${s.id}">${esc(s.name)}</button>${s.description?`<div class="small">${esc(s.description.length>80?s.description.slice(0,80)+'…':s.description)}</div>`:''}${sod?`<div>${warnTxt(sod)}</div>`:''}</td>
-      <td class="nowrap">${fmt(s.startDate)}</td><td class="nowrap">${fmt(s.dueDate)}</td><td class="nowrap">${esc(s.pic||'—')}</td>
+      <td style="min-width:200px"><button class="pname" data-action="sub-view" data-id="${s.id}">${esc(s.name)}</button>${s.description?`<div class="small">${esc(s.description.length>80?s.description.slice(0,80)+'…':s.description)}</div>`:''}</td>
+      <td class="nowrap">${fmt(s.startDate)}</td><td class="nowrap">${fmt(s.dueDate)}</td><td class="nowrap">${fmt(s.actualCompletionDate)}</td><td>${schedHTML(subSched(s),false)}</td><td class="nowrap">${esc(s.pic||'—')}</td>
       <td style="min-width:190px"><div style="display:flex;gap:8px;align-items:center">${progBar(Number(s.progress)||0,s.status)}<input type="number" class="pin" min="0" max="100" step="5" value="${Number(s.progress)||0}" data-action="sub-prog" data-id="${s.id}" aria-label="Completion % for ${esc(s.name)}"></div></td>
       <td>${statusSelect(s.status,'sub-status',s.id)}</td>
       <td style="min-width:200px" class="small">${esc(s.issues||'')}${oi?`<div><span class="pill">${plural(oi,'open issue')}</span></div>`:''}${!s.issues&&!oi?'—':''}</td>
@@ -725,7 +798,9 @@ function statusSentence(p){
   const phr={'Completed':'has been completed','In Progress':'remains in progress','Delayed':'is reported as delayed','Not Started':'has not started yet','On Hold':'is on hold'}[p.status]||'is in progress';
   let t=`The project is currently ${prog}% complete and ${phr}.`;
   if(ss.length)t+=` ${done} of ${plural(ss.length,'sub-project')} ${done===1?'is':'are'} completed.`;
-  if(od)t+=` The due date of ${fmt(p.dueDate)} has passed (overdue by ${plural(od,'day')}).`;
+  const sc=projSched(p);
+  if(p.actualCompletionDate&&(sc.k==='early'||sc.k==='late'))t+=` It was completed on ${fmt(p.actualCompletionDate)}${sc.n===0?', on time':sc.n<0?`, ${plural(-sc.n,'day')} ahead of the expected date`:`, ${plural(sc.n,'day')} after the expected date`}.`;
+  else if(od)t+=` The due date of ${fmt(p.dueDate)} has passed (overdue by ${plural(od,'day')}).`;
   else if(p.status!=='Completed'&&p.dueDate)t+=` Target completion is ${fmt(p.dueDate)}.`;
   return t;
 }
@@ -749,11 +824,12 @@ function projectFields(v,isNew){
     <div class="g3">
       <label class="f">Main PIC *<input class="inp" name="pic" data-req list="picl" value="${esc(v.pic)}"></label>
       <label class="f">Start date *<input type="date" class="inp" name="startDate" data-req value="${v.startDate||''}"></label>
-      <label class="f">Due date *<input type="date" class="inp" name="dueDate" data-req value="${v.dueDate||''}"></label>
+      <label class="f">Expected completion (due date) *<input type="date" class="inp" name="dueDate" data-req value="${v.dueDate||''}"></label>
     </div>
+    <label class="f" style="max-width:320px">Actual completion date<input type="date" class="inp" name="actualCompletionDate" value="${v.actualCompletionDate||''}" max="${TODAY}"><span class="hint">Filled in automatically when the status is set to Completed. You can change it.</span></label>
     <datalist id="picl">${allPics().map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
     <div class="g2">
-      <label class="f">Reported status<select class="inp" name="status">${opts(STATUSES,v.status||'Not Started')}</select><span class="hint">Set by the team. Missed deadlines show as a separate system warning.</span></label>
+      <label class="f">Reported status<select class="inp" name="status" onchange="const a=this.form.actualCompletionDate;if(this.value==='Completed'){if(!a.value)a.value='${TODAY}'}else a.value=''">${opts(STATUSES,v.status||'Not Started')}</select><span class="hint">Set by the team. Missed deadlines show as a separate system warning.</span></label>
       <div class="f" style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);font-weight:500">Progress calculation
         <div class="radios" role="radiogroup">
           <label><input type="radio" name="progressMode" value="auto" ${v.progressMode!=='manual'?'checked':''} onchange="this.form.querySelector('.manualp').hidden=true"><span>Automatic — based on sub-projects</span></label>
@@ -782,7 +858,7 @@ function readProjectForm(f,base){
   if(S.projects.some(p=>p.id!==base?.id&&p.name.trim().toLowerCase()===g('name').toLowerCase())){mark(f.name,'A project with this name already exists');good=false}
   if(!good)return null;
   const p=base?clone(base):{id:uid('p'),createdDate:TODAY,archived:false,order:Date.now(),summary:{achievements:[],nextActions:[],overallRemarks:''}};
-  Object.assign(p,{name:g('name'),description:g('description'),pic:g('pic'),startDate:g('startDate'),dueDate:g('dueDate'),status:g('status'),progressMode:g('progressMode')||'auto',manualProgress:Number(fd.get('manualProgress')||0),objective:g('objective'),benefit:g('benefit'),remarks:g('remarks')});
+  Object.assign(p,{name:g('name'),description:g('description'),pic:g('pic'),startDate:g('startDate'),dueDate:g('dueDate'),actualCompletionDate:g('status')==='Completed'?(g('actualCompletionDate')||TODAY):'',status:g('status'),progressMode:g('progressMode')||'auto',manualProgress:Number(fd.get('manualProgress')||0),objective:g('objective'),benefit:g('benefit'),remarks:g('remarks')});
   if(fd.has('overallRemarks')){p.summary=p.summary||{};p.summary.overallRemarks=g('overallRemarks')}
   return p;
 }
@@ -816,8 +892,9 @@ function subModal({id,project}){
     <p class="small" style="margin:0">${esc(p.name)}</p>
     <label class="f">Sub-project name *<input class="inp" name="name" data-req maxlength="120" value="${esc(v.name)}"></label>
     <label class="f">Description<textarea class="inp" name="description" rows="2">${esc(v.description)}</textarea></label>
-    <div class="g3"><label class="f">Start date<input type="date" class="inp" name="startDate" value="${v.startDate}"></label><label class="f">Due date<input type="date" class="inp" name="dueDate" value="${v.dueDate}"></label><label class="f">PIC *<input class="inp" name="pic" data-req list="picl2" value="${esc(v.pic)}"><datalist id="picl2">${allPics().map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label></div>
-    <div class="g2"><label class="f">Status<select class="inp" name="status" onchange="if(this.value==='Completed'){this.form.progress.value=100;this.form.progress.nextElementSibling.value='100%'}">${opts(STATUSES,v.status)}</select></label>
+    <div class="g3"><label class="f">Start date<input type="date" class="inp" name="startDate" value="${v.startDate}"></label><label class="f">Expected completion (due date)<input type="date" class="inp" name="dueDate" value="${v.dueDate}"></label><label class="f">PIC *<input class="inp" name="pic" data-req list="picl2" value="${esc(v.pic)}"><datalist id="picl2">${allPics().map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label></div>
+    <div class="g3"><label class="f">Status<select class="inp" name="status" onchange="const a=this.form.actualCompletionDate;if(this.value==='Completed'){this.form.progress.value=100;this.form.progress.nextElementSibling.value='100%';if(!a.value)a.value='${TODAY}'}else a.value=''">${opts(STATUSES,v.status)}</select></label>
+    <label class="f">Actual completion date<input type="date" class="inp" name="actualCompletionDate" value="${v.actualCompletionDate||''}" max="${TODAY}"></label>
     <label class="f">Completion<div class="range"><input type="range" name="progress" min="0" max="100" step="5" value="${Number(v.progress)||0}" oninput="this.nextElementSibling.value=this.value+'%'"><output>${Number(v.progress)||0}%</output></div></label></div>
     <label class="f">Issues / challenges<textarea class="inp" name="issues" rows="2">${esc(v.issues)}</textarea></label>
     <label class="f">Resolution / action taken<textarea class="inp" name="resolution" rows="2">${esc(v.resolution)}</textarea></label>
@@ -826,7 +903,7 @@ function subModal({id,project}){
       if(!ok)return false;if(g('startDate')&&g('dueDate')&&g('dueDate')<g('startDate')){mark(f.dueDate,'Due date must be on or after the start date');return false}
       const q=s?clone(s):{id:uid('s'),projectId:pid,order:Date.now()};let st=g('status'),pr=Number(fd.get('progress'));
       if(st==='Completed')pr=100;else if(pr===100&&st!=='On Hold')st='Completed';else if(pr>0&&st==='Not Started')st='In Progress';
-      Object.assign(q,{name:g('name'),description:g('description'),startDate:g('startDate'),dueDate:g('dueDate'),pic:g('pic'),status:st,progress:pr,issues:g('issues'),resolution:g('resolution'),remarks:g('remarks')});
+      Object.assign(q,{name:g('name'),description:g('description'),startDate:g('startDate'),dueDate:g('dueDate'),actualCompletionDate:st==='Completed'?(g('actualCompletionDate')||TODAY):'',pic:g('pic'),status:st,progress:pr,issues:g('issues'),resolution:g('resolution'),remarks:g('remarks')});
       await Store.save('subs',q);toast(s?'Sub-project saved':'Sub-project added');return true}});
 }
 function subView(id){
@@ -834,7 +911,7 @@ function subView(id){
   openModal({title:s.name,body:`<div class="view" style="display:grid;gap:14px">
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${badge(s.status)}${od?warnTxt(od):''}<div style="flex:1;min-width:160px;max-width:260px">${progBar(Number(s.progress)||0,s.status)}</div></div>
     ${s.description?`<p>${esc(s.description)}</p>`:''}
-    <dl><div><dt>Project</dt><dd>${esc(projById(s.projectId)?.name)}</dd></div><div><dt>PIC</dt><dd>${esc(s.pic||'—')}</dd></div><div><dt>Start date</dt><dd>${fmt(s.startDate)}</dd></div><div><dt>Due date</dt><dd>${fmt(s.dueDate)}</dd></div><div><dt>Last updated</dt><dd>${fmt(s.lastUpdated)}</dd></div></dl>
+    <dl><div><dt>Project</dt><dd>${esc(projById(s.projectId)?.name)}</dd></div><div><dt>PIC</dt><dd>${esc(s.pic||'—')}</dd></div><div><dt>Start date</dt><dd>${fmt(s.startDate)}</dd></div><div><dt>Expected completion</dt><dd>${fmt(s.dueDate)}</dd></div><div><dt>Actual completion</dt><dd>${fmt(s.actualCompletionDate)}</dd></div><div><dt>Schedule</dt><dd>${schedHTML(subSched(s))}</dd></div><div><dt>Last updated</dt><dd>${fmt(s.lastUpdated)}</dd></div></dl>
     <div><h3>Issues / challenges</h3><p>${esc(s.issues)||'—'}</p></div>
     <div><h3>Resolution / action taken</h3><p>${esc(s.resolution)||'—'}</p></div>
     <div><h3>Remarks</h3><p>${esc(s.remarks)||'—'}</p></div>
@@ -909,8 +986,10 @@ document.addEventListener('click',async e=>{
     case 'copy-project':copy(projectText(projById(id)));break;
     case 'g-preset':{const [f,to]=ganttRange(t.dataset.k);Object.assign(S.gantt,{preset:t.dataset.k,from:f,to});renderMain();break}
     case 'g-reset':Object.assign(S.gantt,{preset:'all',from:'',to:'',status:'',pic:''});renderMain();break;
-    case 'p-chart':S.pchart[id]={...(S.pchart[id]||{focus:''}),type:t.dataset.k};renderMain();break;
-    case 'p-focus':{const c=S.pchart[id]||{type:'bar',focus:''};c.focus=c.focus===t.dataset.status?'':t.dataset.status;S.pchart[id]=c;renderMain();break}
+    case 'p-chart':getPC(id).type=t.dataset.k;renderMain();break;
+    case 'p-focus':{const c=getPC(id);c.focus=c.focus===t.dataset.status?'':t.dataset.status;renderMain();break}
+    case 'tsort':{const st=stateFor(t.dataset.path);const k=t.dataset.k;if(st.sort!==k){st.sort=k;st.dir='asc'}else if(st.dir==='asc')st.dir='desc';else{st.sort='';st.dir='asc'}renderMain();break}
+    case 'tclear':{const st=stateFor(t.dataset.path);Object.assign(st,{focus:'',q:'',pic:'',deadline:'',sort:'',dir:'asc'});renderMain();break}
     case 'edit-project':editProjectModal(projById(id));break;
     case 'archive':{const p=clone(projById(id));p.archived=!p.archived;await Store.save('projects',p).catch(()=>{});toast(p.archived?'Project archived. Find it under More.':'Project restored');break}
     case 'delete-project':{const p=projById(id);const ns=subsOf(id).length,ni=issuesOf(id).length;
@@ -932,15 +1011,18 @@ document.addEventListener('click',async e=>{
 async function copy(txt){try{await navigator.clipboard.writeText(txt);toast('Copied to clipboard')}catch(e){openModal({title:'Copy summary',body:`<textarea class="inp" rows="12" readonly>${esc(txt)}</textarea>`,footer:`<button type="button" class="btn primary" data-action="close-modal">Done</button>`})}}
 document.addEventListener('change',async e=>{
   const t=e.target;const a=t.dataset.action;
-  if(a==='sub-status'){const s=clone(subById(t.dataset.id));s.status=t.value;if(t.value==='Completed')s.progress=100;else if(Number(s.progress)>=100)s.progress=90;if(t.value==='Not Started'&&!s.progress)s.progress=0;await Store.save('subs',s).then(()=>toast('Status updated')).catch(()=>{});return}
+  if(a==='sub-status'){const s=clone(subById(t.dataset.id));s.status=t.value;if(t.value==='Completed'){s.progress=100;s.actualCompletionDate=s.actualCompletionDate||TODAY}else{s.actualCompletionDate='';if(Number(s.progress)>=100)s.progress=90}if(t.value==='Not Started'&&!s.progress)s.progress=0;await Store.save('subs',s).then(()=>toast('Status updated')).catch(()=>{});return}
   if(a==='sub-prog'){let v=Math.max(0,Math.min(100,Math.round(Number(t.value)||0)));const s=clone(subById(t.dataset.id));s.progress=v;
     if(v===100&&s.status!=='Completed')s.status='Completed';else if(v<100&&s.status==='Completed')s.status='In Progress';else if(v>0&&s.status==='Not Started')s.status='In Progress';
+    if(s.status==='Completed')s.actualCompletionDate=s.actualCompletionDate||TODAY;else s.actualCompletionDate='';
     await Store.save('subs',s).then(()=>toast('Progress updated')).catch(()=>{});return}
   if(a==='issue-status'){const i=issueById(t.dataset.id);if(t.value==='Resolved'&&!i.resolution){t.value=i.status;issueModal({id:i.id});setTimeout(()=>{const f=$('#mform');if(f){f.status.value='Resolved';f.actualDate.value=f.actualDate.value||TODAY;f.resolution.focus()}},40);return}
     const q=clone(i);q.status=t.value;if(t.value==='Resolved')q.actualDate=q.actualDate||TODAY;else q.actualDate='';await Store.save('issues',q).then(()=>toast('Issue updated')).catch(()=>{});return}
+  if(t.dataset.set&&t.tagName==='SELECT'){setPath(t.dataset.set,t.value);return}
   if(t.dataset.bind){const [grp,key]=t.dataset.bind.split('.');S[grp][key]=t.value;if(grp==='gantt'&&(key==='from'||key==='to'))S.gantt.preset=S.gantt.from||S.gantt.to?'':'all';renderMain()}
 });
-document.addEventListener('input',e=>{if(e.target.id==='more-q'){S.moreQ=e.target.value;renderMorePanel(false)}});
+function setPath(path,val){const i=path.lastIndexOf('.');const st=stateFor(path.slice(0,i));st[path.slice(i+1)]=val;renderMain()}
+document.addEventListener('input',e=>{if(e.target.id==='more-q'){S.moreQ=e.target.value;renderMorePanel(false)}else if(e.target.dataset.set&&e.target.tagName==='INPUT')setPath(e.target.dataset.set,e.target.value)});
 document.addEventListener('submit',async e=>{
   e.preventDefault();const f=e.target;const btn=f.querySelector('[type=submit]');
   if(f.id==='pform'){const p=readProjectForm(f,null);if(!p){f.querySelector('.err')?.focus();return}btn.disabled=true;
