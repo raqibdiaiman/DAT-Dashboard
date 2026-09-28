@@ -11,7 +11,7 @@ service cloud.firestore {
     }
     match /{collection}/{docId} {
       allow read, write: if isGroupStaff()
-        && collection in ['mainProjects', 'subProjects', 'projectIssues', 'meta', 'backups'];
+        && collection in ['mainProjects', 'subProjects', 'projectIssues', 'meta', 'backups', 'bauGroups', 'bauTasks', 'bauCycles'];
     }
   }
 }

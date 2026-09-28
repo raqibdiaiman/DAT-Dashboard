@@ -57,7 +57,7 @@ h1,h2,h3{margin:0;line-height:1.2}
 .tab:hover{color:#fff;background:rgba(255,255,255,.05)}
 .tab.ptab.active{flex:0 1 auto;min-width:56px}
 .tab.active{color:#fff;border-bottom-color:#76A9F5;font-weight:600}
-.tab[hidden]{display:none}
+.tab[hidden],.tab-more[hidden]{display:none}
 .tab-more,.tab-add{flex:none;background:none;border:0;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:6px;padding:0 12px;font-weight:500;font-size:14px;white-space:nowrap}
 .tab-more.active{color:#fff;box-shadow:inset 0 -3px 0 #76A9F5}
 .tab-add{margin-left:4px;color:#fff}
@@ -65,6 +65,13 @@ h1,h2,h3{margin:0;line-height:1.2}
 .tab-add:hover span.pill-add,.tab-add.active span.pill-add{background:rgba(255,255,255,.12)}
 .tab-more svg,.tab-add svg{width:15px;height:15px}
 @media (max-width:760px){.long{display:none}.brand b{display:none}.top-in{padding:0 10px;gap:2px}.tab{padding:0 10px}.tab-add .lbl{display:none}.tab-add span.pill-add{padding:5px 8px}}
+.areasw{flex:none;align-self:center;display:inline-flex;background:rgba(255,255,255,.1);border-radius:8px;padding:3px;margin-right:6px}
+.areasw button{border:0;background:none;color:rgba(255,255,255,.75);font-weight:600;font-size:13px;padding:5px 12px;border-radius:6px}
+.areasw button[aria-pressed="true"]{background:#fff;color:var(--nav)}
+@media (max-width:760px){.areasw button{padding:5px 8px;font-size:12px}
+.top-in{flex-wrap:wrap;height:auto;row-gap:0}.top-in>.brand,.top-in>.tab-more,.top-in>.tab-add{height:50px}.areasw{margin-right:auto}
+.tabs{order:10;flex:1 0 100%;height:44px;border-top:1px solid rgba(255,255,255,.1)}.tab-more{order:8}.tab-user{order:8}.tab-add{order:9}}
+body.locked .areasw{visibility:hidden}
 .tab-user{flex:none;align-self:center;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;font-weight:700;font-size:13px;margin-left:4px}
 .tab-user:hover{background:rgba(255,255,255,.2)}
 .tab-user[hidden]{display:none}
@@ -195,6 +202,7 @@ select.ssel{appearance:none;-webkit-appearance:none;border:1px solid color-mix(i
 .sch{display:inline-flex;flex-direction:column;gap:1px;line-height:1.3}
 .sch b{font-size:12.5px;font-weight:600;color:var(--c,var(--muted));white-space:nowrap}
 .sch small{font-size:11.5px;color:var(--faint);white-space:nowrap}
+.sch-na{--c:var(--faint)}
 .sch-early{--c:var(--s-done)}.sch-late{--c:var(--s-hold)}.sch-overdue{--c:var(--s-late)}.sch-soon{--c:var(--s-hold)}.sch-ontrack{--c:var(--muted)}.sch-done{--c:var(--s-done)}
 .status-note{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
 .status-note .lab{font-size:12.5px;color:var(--muted);margin-right:4px}
@@ -326,6 +334,7 @@ select.ssel{appearance:none;-webkit-appearance:none;border:1px solid color-mix(i
 <header class="top">
   <nav class="top-in" aria-label="Main">
     <div class="brand"><div class="mark" aria-hidden="true">DAT</div><b>Project Monitoring</b></div>
+    <div class="areasw" id="areaSw" role="group" aria-label="Section"></div>
     <div class="tabs" id="tabs"></div>
     <button class="tab-more" id="moreBtn" aria-haspopup="true" aria-expanded="false" hidden>More <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
     <button class="tab-user" id="userBtn" data-action="user-menu" hidden title="Account">?</button>
@@ -380,9 +389,9 @@ const ICON={
    ProjectIssues. Swap Store's internals to connect SharePoint,
    Dataverse or SQL later; the UI only calls Store.save/remove.
    ========================================================= */
-const TABLES={projects:'mainProjects',subs:'subProjects',issues:'projectIssues'};
+const TABLES={projects:'mainProjects',subs:'subProjects',issues:'projectIssues',bauGroups:'bauGroups',bauTasks:'bauTasks',bauCycles:'bauCycles'};
 const S={
-  projects:[],subs:[],issues:[],loaded:{projects:false,subs:false,issues:false},mode:null,
+  projects:[],subs:[],issues:[],bauGroups:[],bauTasks:[],bauCycles:[],loaded:{projects:false,subs:false,issues:false,bauGroups:false,bauTasks:false,bauCycles:false},mode:null,
   view:'dashboard',
   dash:{chart:'donut',focus:'',q:'',pic:'',deadline:'',sort:'',dir:'asc'},
   gantt:{preset:'all',from:'',to:'',status:'',pic:''},
@@ -391,7 +400,7 @@ const S={
 let DB=null;const LS_DATA='dat-pm-v2';
 function lsGet(k,d){try{const v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-function saveLocal(){lsSet(LS_DATA,JSON.stringify({projects:S.projects,subs:S.subs,issues:S.issues}))}
+function saveLocal(){lsSet(LS_DATA,JSON.stringify({projects:S.projects,subs:S.subs,issues:S.issues,bauGroups:S.bauGroups,bauTasks:S.bauTasks,bauCycles:S.bauCycles}))}
 const Store={
   async save(table,obj){
     obj.lastUpdated=TODAY;
@@ -464,7 +473,7 @@ function authErr(e){
 function startAuth(db,subscribe){
   AUTH=firebase.auth();S.auth.state='checking';refresh();
   AUTH.onAuthStateChanged(async u=>{
-    if(!u){stopData();S.projects=[];S.subs=[];S.issues=[];S.loaded={projects:false,subs:false,issues:false};S.auth.state='out';refresh();return}
+    if(!u){stopData();S.projects=[];S.subs=[];S.issues=[];S.bauGroups=[];S.bauTasks=[];S.bauCycles=[];S.loaded={projects:false,subs:false,issues:false,bauGroups:false,bauTasks:false,bauCycles:false};S.auth.state='out';refresh();return}
     if(!workEmail(u.email)){S.auth.msg=`Only ${DOMAIN_LIST} email addresses can use this dashboard.`;await AUTH.signOut();return}
     S.auth.email=u.email;
     if(!u.emailVerified){S.auth.state='verify';refresh();return}
@@ -537,11 +546,11 @@ function renderAuth(){
    ========================================================= */
 const BK='backups',BK_KEEP=30;let autoBkDone=false;
 const bkSupported=()=>S.mode==='firebase'&&S.auth.state==='in';
-function bkPayload(){return {projects:S.projects,subs:S.subs,issues:S.issues}}
+function bkPayload(){return {projects:S.projects,subs:S.subs,issues:S.issues,bauGroups:S.bauGroups,bauTasks:S.bauTasks,bauCycles:S.bauCycles}}
 async function saveSnapshot(id,kind){
   const data=JSON.stringify(bkPayload());
   if(data.length>900000){toast('Data is too large for an automatic snapshot. Use Download backup instead.',true);return false}
-  await DB.collection(BK).doc(id).set({createdAt:new Date().toISOString(),date:TODAY,kind,by:S.auth.email||'',counts:{projects:S.projects.length,subs:S.subs.length,issues:S.issues.length},data});
+  await DB.collection(BK).doc(id).set({createdAt:new Date().toISOString(),date:TODAY,kind,by:S.auth.email||'',counts:{projects:S.projects.length,subs:S.subs.length,issues:S.issues.length,bau:S.bauTasks.length,bauGroups:S.bauGroups.length},data});
   return true;
 }
 async function listSnapshots(){const q=await DB.collection(BK).get();return q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))}
@@ -561,12 +570,13 @@ async function restoreData(d){
     await saveSnapshot('before-restore-'+Date.now(),'Before restore');
     const ops=[];
     for(const [k,coll] of Object.entries(TABLES)){
+      if(!Array.isArray(d[k]))continue;
       const keep=new Set(d[k].map(x=>x.id));
       for(const cur of S[k])if(!keep.has(cur.id))ops.push(b=>b.delete(DB.collection(coll).doc(cur.id)));
       for(const x of d[k]){const {id,...body}=x;ops.push(b=>b.set(DB.collection(coll).doc(id),body))}
     }
     for(let i=0;i<ops.length;i+=400){const b=DB.batch();ops.slice(i,i+400).forEach(f=>f(b));await b.commit()}
-  }else if(S.mode==='local'){S.projects=d.projects;S.subs=d.subs;S.issues=d.issues;saveLocal();refresh()}
+  }else if(S.mode==='local'){S.projects=d.projects;S.subs=d.subs;S.issues=d.issues;if(Array.isArray(d.bauGroups))S.bauGroups=d.bauGroups;if(Array.isArray(d.bauTasks))S.bauTasks=d.bauTasks;if(Array.isArray(d.bauCycles))S.bauCycles=d.bauCycles;saveLocal();refresh()}
   else throw {msg:'Restore isn’t available in this version.'};
 }
 function backupsModal(){
@@ -595,6 +605,7 @@ async function initData(){
       for(const [k,coll] of Object.entries(TABLES)){
         UNSUBS.push(db.collection(coll).onSnapshot(s=>{S[k]=s.docs.map(d=>({...clone(d.data()),id:d.id}));S.loaded[k]=true;refresh();if(ready())autoBackupOnce()},onErr));
       }
+      if(S.mode==='firebase')UNSUBS.push(db.collection('meta').doc('holidays').onSnapshot(d=>{const v=d.exists?d.data():null;S.holidays=v&&Array.isArray(v.list)?v.list:null;HOLS=null;refresh()},()=>{}));
     };
     if(S.mode==='firebase'){startAuth(db,subscribe);return}
     subscribe();
@@ -602,8 +613,9 @@ async function initData(){
     S.mode='local';
     let d=null;try{d=JSON.parse(lsGet(LS_DATA,'null'))}catch(e){}
     if(!d){d=await fetchSample();if(d)lsSet(LS_DATA,JSON.stringify(d))}
-    if(d){S.projects=d.projects||[];S.subs=d.subs||[];S.issues=d.issues||[]}
-    S.loaded={projects:true,subs:true,issues:true};refresh();
+    if(d){S.projects=d.projects||[];S.subs=d.subs||[];S.issues=d.issues||[];S.bauGroups=d.bauGroups||[];S.bauTasks=d.bauTasks||[];S.bauCycles=d.bauCycles||[]}
+    try{const h=JSON.parse(lsGet('dat-pm-holidays','null'));if(Array.isArray(h))S.holidays=h}catch(e){}
+    S.loaded={projects:true,subs:true,issues:true,bauGroups:true,bauTasks:true,bauCycles:true};refresh();
   }
 }
 const ready=()=>S.loaded.projects&&S.loaded.subs&&S.loaded.issues;
@@ -642,27 +654,36 @@ const statusSelect=(val,action,id)=>`<select class="ssel c-${SCLS[val]||'ns'}" d
 const emptyState=(t,p,btn)=>`<div class="empty"><h3>${t}</h3>${p?`<p>${p}</p>`:''}${btn||''}</div>`;
 const warnTxt=d=>`<span class="warn">${ICON.warn}Overdue by ${plural(d,'day')}</span>`;
 
-function donut(segs,total,focus,action){
+function donut(segs,total,focus,action,cls=SCLS){
   const R=68,C=2*Math.PI*R;let off=0;const nz=segs.filter(s=>s[1]).length;
   const arcs=segs.map(([st,n])=>{const len=total?n/total*C:0;const gap=nz>1&&len>3?2:0;
-    const a=n?`<circle class="seg ${focus&&focus!==st?'dim':''}" r="${R}" cx="95" cy="95" fill="none" stroke="var(--s-${SCLS[st]})" stroke-width="24" stroke-dasharray="${Math.max(len-gap,0)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 95 95)" data-action="${action}" data-status="${st}" tabindex="0" role="button" aria-label="${st}: ${n}, ${pct(n,total)}%"><title>${st}: ${n} (${pct(n,total)}%)</title></circle>`:'';off+=len;return a}).join('');
+    const a=n?`<circle class="seg ${focus&&focus!==st?'dim':''}" r="${R}" cx="95" cy="95" fill="none" stroke="var(--s-${cls[st]})" stroke-width="24" stroke-dasharray="${Math.max(len-gap,0)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 95 95)" data-action="${action}" data-status="${st}" tabindex="0" role="button" aria-label="${st}: ${n}, ${pct(n,total)}%"><title>${st}: ${n} (${pct(n,total)}%)</title></circle>`:'';off+=len;return a}).join('');
   const center=focus?(segs.find(s=>s[0]===focus)?.[1]??0):total;
   return `<svg class="donut" viewBox="0 0 190 190" width="190" height="190" role="img" aria-label="Status chart"><circle r="${R}" cx="95" cy="95" fill="none" stroke="var(--surface-2)" stroke-width="24"/>${arcs}<text x="95" y="94" text-anchor="middle" font-size="34" font-weight="600" fill="var(--ink)">${center}</text><text x="95" y="116" text-anchor="middle" font-size="12" fill="var(--muted)">${focus?esc(focus):'total'}</text></svg>`;
 }
-function chartBlock(counts,total,type,focus,action){
-  const segs=CHART_ORDER.map(st=>[st,counts[st]||0]).filter(([st,n])=>st!=='On Hold'||n>0);
+function chartBlock(counts,total,type,focus,action,order=CHART_ORDER,cls=SCLS){
+  const segs=order.map(st=>[st,counts[st]||0]).filter(([st,n])=>(st!=='On Hold'&&st!=='No tasks due')||n>0);
   if(!total)return emptyState('Nothing to chart yet','');
-  if(type==='donut')return `<div class="chartwrap">${donut(segs,total,focus,action)}<div class="legend">${segs.map(([st,n])=>`<button data-action="${action}" data-status="${st}" aria-pressed="${focus===st}" style="--c:var(--s-${SCLS[st]})"><i></i><span>${st}</span><span class="c">${n}</span><span class="p">${pct(n,total)}%</span></button>`).join('')}</div></div>`;
+  if(type==='donut')return `<div class="chartwrap">${donut(segs,total,focus,action,cls)}<div class="legend">${segs.map(([st,n])=>`<button data-action="${action}" data-status="${st}" aria-pressed="${focus===st}" style="--c:var(--s-${cls[st]})"><i></i><span>${st}</span><span class="c">${n}</span><span class="p">${pct(n,total)}%</span></button>`).join('')}</div></div>`;
   const max=Math.max(...segs.map(s=>s[1]),1);
-  return `<div class="hbars">${segs.map(([st,n])=>`<button class="hbar ${focus&&focus!==st?'dimmed':''}" data-action="${action}" data-status="${st}" aria-pressed="${focus===st}" style="--c:var(--s-${SCLS[st]})"><span>${st}</span><span class="track"><i style="width:${n/max*100}%"></i></span><span class="v">${n}<small>${pct(n,total)}%</small></span></button>`).join('')}</div>`;
+  return `<div class="hbars">${segs.map(([st,n])=>`<button class="hbar ${focus&&focus!==st?'dimmed':''}" data-action="${action}" data-status="${st}" aria-pressed="${focus===st}" style="--c:var(--s-${cls[st]})"><span>${st}</span><span class="track"><i style="width:${n/max*100}%"></i></span><span class="v">${n}<small>${pct(n,total)}%</small></span></button>`).join('')}</div>`;
 }
 const countBy=(items,fn)=>items.reduce((a,x)=>{const k=fn(x);a[k]=(a[k]||0)+1;return a},{});
 
 /* =========================================================
    Navigation
    ========================================================= */
+const areaOf=v=>(v==='bau'||v==='bauchk'||String(v).startsWith('g:'))?'bau':'projects';
+const LAST={projects:'dashboard',bau:'bau'};
 function renderTabs(){
   const tabs=$('#tabs');const v=S.view;
+  const area=areaOf(v);LAST[area]=v;
+  $('#areaSw').innerHTML=`<button data-action="area" data-k="projects" aria-pressed="${area==='projects'}">Projects</button><button data-action="area" data-k="bau" aria-pressed="${area==='bau'}">BAU</button>`;
+  const addB=$('#addBtn');addB.querySelector('.lbl').textContent=area==='bau'?'Add BAU Group':'Add Project';if(area==='bau'){addB.removeAttribute('data-nav');addB.dataset.action='bau-group-modal'}else{addB.dataset.nav='add';delete addB.dataset.action}
+  if(area==='bau'){
+    tabs.innerHTML=`<button class="tab ${v==='bau'?'active':''}" data-nav="bau" ${v==='bau'?'aria-current="page"':''}><span class="long">BAU </span>Dashboard</button><button class="tab ${v==='bauchk'?'active':''}" data-nav="bauchk" ${v==='bauchk'?'aria-current="page"':''}>Checklist</button>`+
+      bauGroupsSorted().map(g=>`<button class="tab ptab ${v==='g:'+g.id?'active':''}" data-nav="g:${g.id}" data-pid="${g.id}" title="${esc(g.name)}" ${v==='g:'+g.id?'aria-current="page"':''}>${esc(g.name)}</button>`).join('');
+  }else
   tabs.innerHTML=`<button class="tab ${v==='dashboard'?'active':''}" data-nav="dashboard" ${v==='dashboard'?'aria-current="page"':''}>Dashboard</button><button class="tab ${v==='gantt'?'active':''}" data-nav="gantt" ${v==='gantt'?'aria-current="page"':''}><span class="long">Overall </span>Gantt</button>`+
     activeProjects().map(p=>`<button class="tab ptab ${v==='p:'+p.id?'active':''}" data-nav="p:${p.id}" data-pid="${p.id}" title="${esc(p.name)}" ${v==='p:'+p.id?'aria-current="page"':''}>${esc(p.name)}</button>`).join('');
   $('#addBtn').classList.toggle('active',v==='add');
@@ -673,7 +694,7 @@ let hiddenTabs=[];
 function fitTabs(){
   const bar=$('#tabs'),more=$('#moreBtn');const pt=[...bar.querySelectorAll('.ptab')];
   pt.forEach(t=>t.hidden=false);hiddenTabs=[];
-  const hasArchived=archivedProjects().length>0;
+  const hasArchived=areaOf(S.view)==='projects'&&archivedProjects().length>0;
   more.hidden=!hasArchived;
   if(bar.scrollWidth>bar.clientWidth+1){
     more.hidden=false;
@@ -681,8 +702,9 @@ function fitTabs(){
     const act=pt.find(t=>t.classList.contains('active'));
     if(act&&bar.scrollWidth>bar.clientWidth+1){act.hidden=true;hiddenTabs.unshift(act.dataset.pid)}
   }
+  if(!hiddenTabs.length&&!hasArchived)more.hidden=true;
   bar.scrollLeft=0;
-  const activeHidden=S.view.startsWith('p:')&&(projById(S.view.slice(2))?.archived||hiddenTabs.includes(S.view.slice(2)));
+  const activeHidden=(S.view.startsWith('p:')||S.view.startsWith('g:'))&&(projById(S.view.slice(2))?.archived||hiddenTabs.includes(S.view.slice(2)));
   more.classList.toggle('active',!!activeHidden);
   more.firstChild.textContent=hiddenTabs.length?`More (${hiddenTabs.length}) `:'More ';
   if($('#morePanel').classList.contains('open'))renderMorePanel(false);
@@ -695,6 +717,13 @@ function openMore(){
 function closeMore(){$('#morePanel').classList.remove('open');$('#moreBtn').setAttribute('aria-expanded','false')}
 function renderMorePanel(focus){
   const q=S.moreQ.trim().toLowerCase();const pn=$('#morePanel');
+  if(areaOf(S.view)==='bau'){
+    const gi=g=>`<li><button data-nav="g:${g.id}"><span>${esc(g.name)}</span>${gbadge(groupStatus(monthRows(curMonth(),g.id)))}</button></li>`;
+    const list=q?S.bauGroups.filter(g=>[g.name,g.owner,g.entity].join(' ').toLowerCase().includes(q)):hiddenTabs.map(groupById).filter(Boolean);
+    const body=list.length?(q?'':'<li class="grp">More BAU groups</li>')+list.map(gi).join(''):`<li class="grp">${q?'No groups match.':'All groups are shown as tabs.'}</li>`;
+    if(pn.querySelector('#more-q'))pn.querySelector('ul').innerHTML=body;else pn.innerHTML=`<div class="ms"><input class="inp" id="more-q" type="search" placeholder="Search BAU groups" aria-label="Search BAU groups" value="${esc(S.moreQ)}"></div><ul>${body}</ul>`;
+    if(focus)setTimeout(()=>pn.querySelector('#more-q')?.focus(),10);return;
+  }
   const item=p=>`<li><button data-nav="p:${p.id}"><span>${esc(p.name)}</span>${badge(p.status)}</button></li>`;
   let body='';
   if(q){const hits=S.projects.filter(p=>p.name.toLowerCase().includes(q)||(p.pic||'').toLowerCase().includes(q));
@@ -746,6 +775,386 @@ const projSched=(p)=>schedule(p.dueDate,p.actualCompletionDate,p.status==='Compl
 const subSched=s=>schedule(s.dueDate,s.actualCompletionDate,Number(s.progress)||0,s.status);
 const DEADLINE_OPTS=[['','All schedules'],['overdue','Overdue'],['ontrack','In progress, on track'],['early','Completed on time / early'],['late','Completed late'],['done','Completed, no actual date']];
 const selOpts=(pairs,val)=>pairs.map(([v,l])=>`<option value="${esc(v)}" ${v===val?'selected':''}>${esc(l)}</option>`).join('');
+/* =========================================================
+   BAU
+   Separate area from Projects. BAU never changes project data.
+   bauGroups = BAU "main" areas (e.g. Regulatory Reporting)
+   bauTasks  = recurring tasks in a group (monthly / quarterly /
+               half-yearly / yearly) with a due rule, PIC, reviewer
+   bauCycles = one record per task per period, saved only once
+               someone updates it (otherwise shown as Not Started)
+   A period is identified by its period-end month (YYYY-MM).
+   ========================================================= */
+const BAU_STATUSES=['Not Started','In Progress','Pending Review','Completed','Not Applicable'];
+const BCLS={'Not Started':'ns','In Progress':'ip','Pending Review':'hold','Completed':'done','Not Applicable':'ns'};
+const GSTATUS=['Completed','On track','At risk','Overdue','No tasks due'];
+const GCLS={'Completed':'done','On track':'ip','At risk':'hold','Overdue':'late','No tasks due':'ns'};
+const FREQS=['Monthly','Quarterly','Half-yearly','Yearly'];
+const FSTEP={Monthly:1,Quarterly:3,'Half-yearly':6,Yearly:12};
+const BAU_CATS=['Month-end close','Regulatory reporting','Management reporting','Data maintenance','Reconciliation','Audit','Other'];
+const MONTHS_L=['January','February','March','April','May','June','July','August','September','October','November','December'];
+/* Kuala Lumpur public holidays (national + Federal Territory). Editable in the app: BAU Dashboard → Public holidays. */
+const DEFAULT_HOLIDAYS=[
+ ['2026-01-01','New Year’s Day'],['2026-02-01','Federal Territory Day / Thaipusam'],['2026-02-02','Thaipusam (replacement)'],['2026-02-17','Chinese New Year'],['2026-02-18','Chinese New Year (2nd day)'],
+ ['2026-03-20','Hari Raya Aidilfitri'],['2026-03-21','Hari Raya Aidilfitri (2nd day)'],['2026-05-01','Labour Day'],['2026-05-27','Hari Raya Haji'],['2026-05-28','Hari Raya Haji (2nd day)'],
+ ['2026-05-31','Wesak Day'],['2026-06-01','Agong’s Birthday'],['2026-06-17','Awal Muharram'],['2026-08-25','Maulidur Rasul'],['2026-08-31','National Day'],['2026-09-16','Malaysia Day'],
+ ['2026-11-08','Deepavali'],['2026-11-09','Deepavali (replacement)'],['2026-12-25','Christmas Day'],
+ ['2027-01-01','New Year’s Day'],['2027-01-22','Thaipusam'],['2027-02-01','Federal Territory Day'],['2027-02-06','Chinese New Year'],['2027-02-07','Chinese New Year (2nd day)'],
+ ['2027-03-10','Hari Raya Aidilfitri (tentative)'],['2027-03-11','Hari Raya Aidilfitri, 2nd day (tentative)'],['2027-05-01','Labour Day'],['2027-05-17','Hari Raya Haji (tentative)'],['2027-05-18','Hari Raya Haji, 2nd day (tentative)'],
+ ['2027-05-20','Wesak Day'],['2027-06-06','Awal Muharram (tentative)'],['2027-06-07','Agong’s Birthday'],['2027-08-15','Maulidur Rasul (tentative)'],['2027-08-31','National Day'],['2027-09-16','Malaysia Day'],
+ ['2027-10-28','Deepavali'],['2027-12-25','Christmas Day']
+].map(([date,name])=>({date,name}));
+S.holidays=null;let HOLS=null;
+const holidayList=()=>(S.holidays||DEFAULT_HOLIDAYS).slice().sort((a,b)=>a.date.localeCompare(b.date));
+function isHoliday(d){if(!HOLS)HOLS=new Set(holidayList().map(h=>h.date));return HOLS.has(d)}
+async function saveHolidays(list){
+  S.holidays=list;HOLS=null;
+  if(S.mode==='firebase'&&DB){try{await DB.collection('meta').doc('holidays').set({list,lastUpdated:TODAY})}catch(e){writeErr(e)}}
+  else lsSet('dat-pm-holidays',JSON.stringify(list));
+  refresh();
+}
+const curMonth=()=>TODAY.slice(0,7);
+function monthAdd(ym,k){const [y,m]=ym.split('-').map(Number);const d=new Date(y,m-1+k,1);return `${d.getFullYear()}-${pad(d.getMonth()+1)}`}
+const monthLabel=ym=>{const [y,m]=ym.split('-').map(Number);return `${MONTHS_L[m-1]} ${y}`};
+const monShort=ym=>{const [y,m]=ym.split('-').map(Number);return `${MONTHS[m-1]} ${y}`};
+function nthDay(ym,n,basis){
+  const [y,m]=ym.split('-').map(Number);const last=new Date(y,m,0).getDate();n=Math.max(1,Number(n)||1);
+  if(basis==='workday'){let c=0,lastWd=last;for(let d=1;d<=last;d++){const dt=new Date(y,m-1,d),wd=dt.getDay();if(wd!==0&&wd!==6&&!isHoliday(iso(dt))){c++;lastWd=d;if(c===n)return iso(dt)}}return iso(new Date(y,m-1,lastWd))}
+  return iso(new Date(y,m-1,Math.min(n,last)));
+}
+function periodsDueIn(t,ym){const end=monthAdd(ym,-(Number(t.dueOffset)||0));const m=Number(end.slice(5)),ye=Number(t.yearEnd)||12,st=FSTEP[t.frequency]||1;return (((m-ye)%st)+st)%st===0?[end]:[]}
+function periodLabel(t,p){const s=monShort(p);return t.frequency==='Quarterly'?`Qtr ended ${s}`:t.frequency==='Half-yearly'?`Half-year ended ${s}`:t.frequency==='Yearly'?`Year ended ${s}`:s}
+const dueFor=(t,p)=>nthDay(monthAdd(p,Number(t.dueOffset)||0),t.dueDay,t.dueBasis);
+const ordinal=n=>{n=Number(n);const s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])};
+function dueRuleText(t){const off=Number(t.dueOffset)||0;return `${ordinal(t.dueDay||1)} ${t.dueBasis==='workday'?'working day':'day'} ${off===0?'of the period-end month':off===1?'of the following month':`${off} months after period end`}`}
+const freqText=t=>t.frequency==='Monthly'?'Monthly':`${t.frequency} · year ends ${MONTHS[(Number(t.yearEnd)||12)-1]}`;
+const cycleId=(t,p)=>`${t.id}__${p}`;
+const groupById=id=>S.bauGroups.find(g=>g.id===id);
+const bauTaskById=id=>S.bauTasks.find(t=>t.id===id);
+const bauGroupsSorted=()=>S.bauGroups.slice().sort((a,b)=>(a.order??0)-(b.order??0)||a.name.localeCompare(b.name));
+function cycleFor(t,p){
+  const id=cycleId(t,p);const s=S.bauCycles.find(c=>c.id===id)||{};
+  return {id,taskId:t.id,period:p,dueDate:dueFor(t,p),status:s.status||'Not Started',preparedDate:s.preparedDate||'',completedDate:s.completedDate||'',reviewedBy:s.reviewedBy||'',pic:s.pic||t.pic||'',reviewer:s.reviewer??(t.reviewer||''),remarks:s.remarks||'',stored:!!s.id};
+}
+const isDone=c=>c.status==='Completed';
+const isLive=c=>c.status!=='Not Applicable';
+function bauSched(c){
+  if(c.status==='Not Applicable')return {k:'na',txt:'Not applicable',sub:'',n:null};
+  if(c.status==='Completed')return schedule(c.dueDate,c.completedDate,100,'Completed');
+  const s=schedule(c.dueDate,'',0,'In Progress');if(c.status==='Pending Review')s.sub='Awaiting review';return s;
+}
+function bauRowsFor(ym,gid){
+  const rows=[];
+  for(const t of S.bauTasks){
+    if(gid!==undefined&&(t.groupId||'')!==gid)continue;
+    for(const p of periodsDueIn(t,ym)){const c=cycleFor(t,p);if(t.fromMonth&&c.dueDate.slice(0,7)<t.fromMonth)continue;if(t.active===false&&!c.stored)continue;rows.push({t,c,carried:false})}
+  }
+  return rows;
+}
+function bauCarryOver(ym,gid){
+  if(ym!==curMonth())return [];
+  const rows=[];for(let k=1;k<=12;k++)for(const r of bauRowsFor(monthAdd(ym,-k),gid))if(!isDone(r.c)&&isLive(r.c)&&r.c.dueDate<TODAY)rows.push({...r,carried:true});
+  return rows;
+}
+function bauStats(rows){
+  const live=rows.filter(r=>isLive(r.c));const done=live.filter(r=>isDone(r.c));
+  const onTime=done.filter(r=>r.c.completedDate&&r.c.completedDate<=r.c.dueDate).length;
+  return {total:live.length,done:done.length,pending:live.filter(r=>r.c.status==='Pending Review').length,
+    overdue:live.filter(r=>!isDone(r.c)&&r.c.dueDate<TODAY).length,
+    soon:live.filter(r=>!isDone(r.c)&&r.c.dueDate>=TODAY&&diffDays(TODAY,r.c.dueDate)<=7).length,
+    onTime:done.length?Math.round(onTime/done.length*100):null,onTimeN:onTime};
+}
+function groupStatus(rows){
+  const live=rows.filter(r=>isLive(r.c));if(!live.length)return 'No tasks due';
+  if(live.some(r=>!isDone(r.c)&&r.c.dueDate<TODAY))return 'Overdue';
+  if(live.every(r=>isDone(r.c)))return 'Completed';
+  if(live.some(r=>!isDone(r.c)&&diffDays(TODAY,r.c.dueDate)<=3))return 'At risk';
+  return 'On track';
+}
+const gbadge=s=>`<span class="badge c-${GCLS[s]||'ns'}">${esc(s)}</span>`;
+function monthRows(ym,gid){return [...bauCarryOver(ym,gid),...bauRowsFor(ym,gid)]}
+function onTimeTrend(n=6){
+  const out=[];for(let k=n-1;k>=0;k--){const ym=monthAdd(curMonth(),-k);const rows=bauRowsFor(ym).filter(r=>isLive(r.c));
+    const due=rows.filter(r=>r.c.dueDate<=TODAY);const onTime=due.filter(r=>isDone(r.c)&&r.c.completedDate<=r.c.dueDate).length;
+    out.push({ym,total:rows.length,due:due.length,onTime,pct:due.length?Math.round(onTime/due.length*100):null})}
+  return out;
+}
+S.bau={month:'',q:'',grp:'',cat:'',pic:'',freq:'',status:'',sort:'due',dir:'asc',carry:true};
+S.bauD={q:'',focus:'',owner:'',sort:'',dir:'asc',chart:'donut'};
+S.bauG={q:'',status:'',sort:'due',dir:'asc'};
+
+/* ---------- shared pieces ---------- */
+function monthNav(ym,carriedN){
+  const isCur=ym===curMonth();
+  return `<section class="filterbar" aria-label="Month" style="align-items:center">
+    <button class="btn" data-action="bau-month" data-k="-1" aria-label="Previous month">‹</button>
+    <div style="min-width:170px;text-align:center"><b style="font-size:17px">${monthLabel(ym)}</b><div class="small">Tasks due this month</div></div>
+    <button class="btn" data-action="bau-month" data-k="1" aria-label="Next month">›</button>
+    ${isCur?'':`<button class="btn ghost" data-action="bau-month" data-k="0">This month</button>`}
+    ${isCur?`<label style="display:flex;gap:8px;align-items:center;font-size:13.5px;margin-left:auto"><input type="checkbox" data-action="bau-carry" ${S.bau.carry?'checked':''} class="check" style="accent-color:var(--accent)"> Include overdue items from earlier months${carriedN?` (${carriedN})`:''}</label>`:''}
+  </section>`;
+}
+function bauFilter(rows,F){
+  const q=(F.q||'').trim().toLowerCase();
+  return rows.filter(r=>(!F.grp||(r.t.groupId||'')===F.grp)&&(!F.cat||r.t.category===F.cat)&&(!F.pic||r.c.pic===F.pic)&&(!F.freq||r.t.frequency===F.freq)
+    &&(!F.status||(F.status==='Overdue'?(!isDone(r.c)&&isLive(r.c)&&r.c.dueDate<TODAY):r.c.status===F.status))
+    &&(!q||[r.t.name,r.t.description,r.t.category,r.c.pic,r.c.reviewer,r.c.remarks,groupById(r.t.groupId)?.name].join(' ').toLowerCase().includes(q)));
+}
+const BAU_GETTERS={name:r=>r.t.name,grp:r=>groupById(r.t.groupId)?.name||'',period:r=>r.c.period,freq:r=>FREQS.indexOf(r.t.frequency),due:r=>r.c.dueDate,pic:r=>r.c.pic,reviewer:r=>r.c.reviewer,status:r=>BAU_STATUSES.indexOf(r.c.status),done:r=>r.c.completedDate,sched:r=>bauSched(r.c).n,cat:r=>r.t.category};
+function bauTable(rows,st,path,showGroup){
+  if(!rows.length)return '';
+  return `<div class="tw"><table class="t"><thead><tr><th><span class="sr">Done</span></th>${sortTh('Task','name',st,path)}${showGroup?sortTh('BAU group','grp',st,path):''}${sortTh('Period','period',st,path)}${sortTh('Due date','due',st,path)}${sortTh('PIC','pic',st,path)}${sortTh('Reviewer','reviewer',st,path)}${sortTh('Status','status',st,path)}${sortTh('Completed on','done',st,path)}${sortTh('Schedule','sched',st,path)}<th>Remarks</th><th><span class="sr">Actions</span></th></tr></thead><tbody>
+  ${rows.map(({t,c,carried})=>`<tr>
+    <td><input type="checkbox" class="check" style="accent-color:var(--s-done)" data-action="bau-done" data-t="${t.id}" data-p="${c.period}" ${isDone(c)||c.status==='Pending Review'?'checked':''} ${c.status==='Not Applicable'?'disabled':''} aria-label="Mark ${esc(t.name)} done" title="${c.reviewer?'Tick when prepared; the reviewer then approves':'Tick when completed'}"></td>
+    <td style="min-width:190px"><button class="pname" data-action="bau-history" data-t="${t.id}">${esc(t.name)}</button><div class="small">${esc(t.category||'')}${t.category?' · ':''}${esc(t.frequency)}</div>${carried?`<div><span class="pill">From ${esc(monthLabel(c.dueDate.slice(0,7)))}</span></div>`:''}</td>
+    ${showGroup?`<td style="min-width:140px">${groupById(t.groupId)?`<button class="pname" data-nav="g:${t.groupId}" style="font-weight:500">${esc(groupById(t.groupId).name)}</button>`:'<span class="small">Ungrouped</span>'}</td>`:''}
+    <td class="nowrap small">${esc(periodLabel(t,c.period))}</td><td class="nowrap">${fmt(c.dueDate)}</td>
+    <td class="nowrap">${esc(c.pic||'—')}</td><td class="nowrap small">${esc(c.reviewer||'—')}</td>
+    <td class="nowrap"><select class="ssel c-${BCLS[c.status]}" data-action="bau-status" data-t="${t.id}" data-p="${c.period}" aria-label="Status">${opts(BAU_STATUSES,c.status)}</select>${c.status==='Pending Review'?` <button class="btn sm" data-action="bau-approve" data-t="${t.id}" data-p="${c.period}" title="Reviewer approves">Approve</button>`:''}</td>
+    <td class="nowrap">${fmt(c.completedDate)}${c.reviewedBy&&isDone(c)?`<div class="small" title="Reviewed by">✓ ${esc(c.reviewedBy)}</div>`:''}</td>
+    <td>${schedHTML(bauSched(c),c.status==='Pending Review')}</td>
+    <td class="small" style="min-width:150px">${esc(c.remarks)||'—'}</td>
+    <td class="nowrap"><button class="iconbtn" data-action="bau-cycle-modal" data-t="${t.id}" data-p="${c.period}" title="Update" aria-label="Update ${esc(t.name)}">${ICON.edit}</button><button class="iconbtn" data-action="bau-history" data-t="${t.id}" title="History" aria-label="History of ${esc(t.name)}">${ICON.eye}</button></td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+const bkpi=(l,v,sub,k,warn)=>`<div class="kpi" style="--k:${k}"><span class="l">${l}</span><span class="n">${v}</span>${sub?`<span class="pc ${warn?'w':''}">${sub}</span>`:''}</div>`;
+
+/* ---------- BAU DASHBOARD ---------- */
+function renderBauDashboard(){
+  const ym=curMonth();const D=S.bauD;const groups=bauGroupsSorted();
+  const all=monthRows(ym);const st=bauStats(all);
+  const last3=onTimeTrend(4).slice(0,3);const d3=last3.reduce((a,m)=>a+m.due,0),o3=last3.reduce((a,m)=>a+m.onTime,0);
+  const gRows=groups.map(g=>{const rows=monthRows(ym,g.id);const s=bauStats(rows);const nxt=rows.filter(r=>!isDone(r.c)&&isLive(r.c)).map(r=>r.c.dueDate).sort()[0];return {g,rows,s,status:groupStatus(rows),next:nxt,tasks:S.bauTasks.filter(t=>t.groupId===g.id&&t.active!==false).length}});
+  const counts=countBy(gRows,r=>r.status);
+  const q=D.q.trim().toLowerCase();
+  let shown=gRows.filter(r=>(!D.focus||r.status===D.focus)&&(!D.owner||r.g.owner===D.owner)&&(!q||[r.g.name,r.g.owner,r.g.entity,r.g.description].join(' ').toLowerCase().includes(q)));
+  shown=applySort(shown,D,{name:r=>r.g.name,owner:r=>r.g.owner,due:r=>r.s.total,done:r=>r.s.total?r.s.done/r.s.total:-1,pending:r=>r.s.pending,overdue:r=>r.s.overdue,next:r=>r.next||'',status:r=>GSTATUS.indexOf(r.status)});
+  const remind=all.filter(r=>isLive(r.c)&&!isDone(r.c)&&diffDays(TODAY,r.c.dueDate)<=7).sort((a,b)=>a.c.dueDate.localeCompare(b.c.dueDate));
+  const trend=onTimeTrend(6);
+  const byPic={};for(const r of bauRowsFor(ym)){if(!isLive(r.c))continue;const k=r.c.pic||'—';const o=byPic[k]||(byPic[k]={n:0,done:0,hrs:0});o.n++;if(isDone(r.c))o.done++;o.hrs+=Number(r.t.estHours)||0}
+  const pics=Object.entries(byPic).sort((a,b)=>b[1].n-a[1].n);
+  const ungrouped=S.bauTasks.filter(t=>!groupById(t.groupId)).length;
+  return `
+  <header class="page-h"><div><h1>BAU dashboard</h1><p class="sub">Recurring BAU work for ${monthLabel(ym)}, tracked separately from projects. Group status is calculated automatically from each group’s tasks.</p></div>
+    <span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-action="holidays">Public holidays</button><button class="btn primary" data-action="bau-group-modal">${ICON.plus}Add BAU group</button></span></header>
+  ${!groups.length?`<div class="panel">${emptyState('No BAU groups yet','Create a BAU group (e.g. Regulatory Reporting), then add its recurring tasks. Each group gets its own tab.',`<span style="display:inline-flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="btn primary" data-action="bau-group-modal">${ICON.plus}Add BAU group</button><button class="btn" data-action="bau-examples">Add example groups</button></span>`)}</div>`:`
+  <section class="kpis" aria-label="BAU figures">
+    ${bkpi('Due this month',st.total,`${groups.length} BAU ${groups.length===1?'group':'groups'}`,'var(--nav)')}
+    ${bkpi('Completed',st.done,st.total?pct(st.done,st.total)+'% of due':'','var(--s-done)')}
+    ${bkpi('Pending review',st.pending,st.pending?'Awaiting reviewer':'','var(--s-hold)')}
+    ${bkpi('Overdue',st.overdue,st.overdue?'Includes earlier months':'','var(--s-late)',st.overdue)}
+    ${bkpi('Due in next 7 days',st.soon,'','var(--s-ip)')}
+    ${bkpi('On-time rate',d3?Math.round(o3/d3*100)+'%':'—','Last 3 months','var(--accent)')}
+  </section>
+  <div class="grid2" style="margin-bottom:16px">
+    <section class="panel"><div class="panel-h"><h2>BAU group status</h2><div class="seg-toggle" role="group" aria-label="Chart type"><button data-action="bau-dchart" data-k="donut" aria-pressed="${D.chart==='donut'}">Donut</button><button data-action="bau-dchart" data-k="bar" aria-pressed="${D.chart==='bar'}">Bar</button></div></div>
+      ${chartBlock(counts,gRows.length,D.chart,D.focus,'bau-focus',GSTATUS,GCLS)}
+      <p class="small" style="margin:12px 0 0">Overdue: a task is past its due date. At risk: something is due within 3 days. Select a status to filter the table below.</p></section>
+    <section class="panel"><div class="panel-h"><h2>Reminders</h2><span class="meta">Overdue and due in the next 7 days</span></div>
+      ${remind.length?`<ul class="list">${remind.slice(0,8).map(({t,c})=>{const dd=diffDays(TODAY,c.dueDate);return `<li><div><button class="l1" data-action="bau-cycle-modal" data-t="${t.id}" data-p="${c.period}">${esc(t.name)}</button><div class="small">${esc(groupById(t.groupId)?.name||'Ungrouped')} · ${esc(periodLabel(t,c.period))} · ${esc(c.pic||'—')}${c.status==='Pending Review'?' · awaiting review':''}</div></div><div style="text-align:right"><div class="nowrap small">${fmt(c.dueDate)}</div>${dd<0?`<span class="pill">${plural(-dd,'day')} overdue</span>`:`<span class="pill ${dd>3?'q':''}">${dd===0?'Due today':'in '+plural(dd,'day')}</span>`}</div></li>`}).join('')}</ul>${remind.length>8?`<p class="small" style="margin:8px 0 0">+${remind.length-8} more in the <button class="linkbtn" data-nav="bauchk">checklist</button></p>`:''}`:emptyState('Nothing overdue or due this week','')}
+    </section>
+  </div>
+  <section class="panel flush">
+    <div class="panel-h"><h2>BAU group summary</h2><span class="meta">${monthLabel(ym)} · select a group to open its tab</span></div>
+    <div class="tbar" role="search" aria-label="Filter BAU groups">
+      <input type="search" class="inp q" id="bd-q" data-set="bauD.q" placeholder="Search group, owner or entity" value="${esc(D.q)}" aria-label="Search BAU groups">
+      <select class="inp" id="bd-st" data-set="bauD.focus" aria-label="Status">${opts(GSTATUS,D.focus,'All statuses')}</select>
+      <select class="inp" id="bd-own" data-set="bauD.owner" aria-label="Owner">${opts(uniq(groups.map(g=>g.owner)),D.owner,'All owners')}</select>
+      ${D.q||D.focus||D.owner||D.sort?`<button class="btn sm ghost" data-action="bau-clear" data-path="bauD">Clear</button>`:''}
+      <span class="cnt">${shown.length} of ${plural(gRows.length,'group')}</span>
+    </div>
+    ${shown.length?`<div class="tw"><table class="t"><thead><tr>${sortTh('BAU group','name',D,'bauD')}${sortTh('Owner','owner',D,'bauD')}${sortTh('Due this month','due',D,'bauD')}${sortTh('Completed','done',D,'bauD')}${sortTh('Pending review','pending',D,'bauD')}${sortTh('Overdue','overdue',D,'bauD')}${sortTh('Next due','next',D,'bauD')}${sortTh('Status','status',D,'bauD')}</tr></thead><tbody>
+    ${shown.map(r=>`<tr class="click" data-nav="g:${r.g.id}"><td style="min-width:200px"><button class="pname" data-nav="g:${r.g.id}">${esc(r.g.name)}</button><div class="small">${r.g.entity?esc(r.g.entity)+' · ':''}${plural(r.tasks,'active task')}</div></td><td class="nowrap">${esc(r.g.owner||'—')}</td><td>${r.s.total}</td><td style="min-width:150px">${r.s.total?progBar(r.s.done/r.s.total*100,'Completed'):'<span class="small">—</span>'}</td><td>${r.s.pending||'—'}</td><td>${r.s.overdue?`<span class="warn">${r.s.overdue}</span>`:'—'}</td><td class="nowrap">${r.next?fmt(r.next):'—'}</td><td>${gbadge(r.status)}</td></tr>`).join('')}
+    </tbody></table></div>`:emptyState('No groups match these filters','',`<button class="btn" data-action="bau-clear" data-path="bauD">Clear filters</button>`)}
+    ${ungrouped?`<p class="small" style="padding:10px 18px;margin:0;border-top:1px solid var(--line)">${plural(ungrouped,'task')} not in a group. Find them in the <button class="linkbtn" data-nav="bauchk">checklist</button> and assign a group via Edit.</p>`:''}
+  </section>
+  <div class="grid2" style="margin-bottom:16px">
+    <section class="panel"><div class="panel-h"><h2>On-time trend</h2><span class="meta">Share of tasks due that were completed on time</span></div>
+      <div class="hbars">${trend.map(m=>`<div class="hbar" style="--c:var(--s-done);cursor:default"><span>${monShort(m.ym)}</span><span class="track"><i style="width:${m.pct??0}%"></i></span><span class="v">${m.pct===null?'—':m.pct+'%'}<small>${m.due?`${m.onTime}/${m.due}`:''}</small></span></div>`).join('')}</div>
+      <p class="small" style="margin:10px 0 0">The current month counts only tasks already due.</p></section>
+    <section class="panel"><div class="panel-h"><h2>Workload by PIC</h2><span class="meta">${monthLabel(ym)}</span></div>
+      ${pics.length?`<div class="tw"><table class="t"><thead><tr><th>PIC</th><th>Tasks</th><th>Completed</th><th>Est. hours</th></tr></thead><tbody>${pics.map(([k,o])=>`<tr><td>${esc(k)}</td><td>${o.n}</td><td>${o.done} <span class="small">(${pct(o.done,o.n)}%)</span></td><td>${Math.round(o.hrs*10)/10}</td></tr>`).join('')}</tbody></table></div>`:'<p class="small">No tasks due this month.</p>'}</section>
+  </div>`}`;
+}
+
+/* ---------- BAU CHECKLIST (all groups) ---------- */
+function renderBauChecklist(){
+  const B=S.bau;const ym=B.month||curMonth();
+  const due=bauRowsFor(ym);const carried=B.carry?bauCarryOver(ym):[];const st=bauStats(due);
+  let rows=bauFilter([...carried,...due],B);rows=applySort(rows,B,BAU_GETTERS);
+  const filtered=!!(B.q||B.grp||B.cat||B.pic||B.freq||B.status);
+  return `
+  <header class="page-h"><div><h1>BAU checklist</h1><p class="sub">Every BAU task due in the month, across all groups. Tick when done${S.bauTasks.some(t=>t.reviewer)?'; tasks with a reviewer go to Pending review until approved':''}.</p></div>
+    <button class="btn primary" data-action="bau-task-modal">${ICON.plus}Add BAU task</button></header>
+  ${!S.bauTasks.length?`<div class="panel">${emptyState('No BAU tasks yet','Create a BAU group first, then add its recurring tasks.',`<button class="btn primary" data-action="bau-group-modal">${ICON.plus}Add BAU group</button>`)}</div>`:`
+  ${monthNav(ym,carried.length)}
+  <section class="kpis" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+    ${bkpi('Due this month',st.total,'','var(--nav)')}${bkpi('Completed',st.done,st.total?pct(st.done,st.total)+'%':'','var(--s-done)')}${bkpi('Pending review',st.pending,'','var(--s-hold)')}${bkpi('Overdue',st.overdue+carried.length,'','var(--s-late)')}${bkpi('On-time rate',st.onTime===null?'—':st.onTime+'%','Of completed','var(--accent)')}
+  </section>
+  <section class="panel flush">
+    <div class="tbar" role="search" aria-label="Filter checklist" style="padding-top:14px">
+      <input type="search" class="inp q" id="bc-q" data-set="bau.q" placeholder="Search task, PIC or remarks" value="${esc(B.q)}" aria-label="Search">
+      <select class="inp" id="bc-grp" data-set="bau.grp" aria-label="BAU group"><option value="">All groups</option>${bauGroupsSorted().map(g=>`<option value="${g.id}" ${g.id===B.grp?'selected':''}>${esc(g.name)}</option>`).join('')}</select>
+      <select class="inp" id="bc-pic" data-set="bau.pic" aria-label="PIC">${opts(uniq([...due,...carried].map(r=>r.c.pic)),B.pic,'All PICs')}</select>
+      <select class="inp" id="bc-freq" data-set="bau.freq" aria-label="Frequency">${opts(FREQS,B.freq,'All frequencies')}</select>
+      <select class="inp" id="bc-st" data-set="bau.status" aria-label="Status">${opts([...BAU_STATUSES,'Overdue'],B.status,'All statuses')}</select>
+      ${filtered?`<button class="btn sm ghost" data-action="bau-clear" data-path="bau">Clear</button>`:''}
+      <span class="cnt">${plural(rows.length,'item')}</span>
+    </div>
+    ${rows.length?bauTable(rows,B,'bau',true):emptyState(filtered?'No items match these filters':'Nothing due this month',filtered?'':'Use the arrows to look at another month.',filtered?`<button class="btn" data-action="bau-clear" data-path="bau">Clear filters</button>`:'')}
+  </section>`}`;
+}
+
+/* ---------- BAU GROUP TAB ---------- */
+function renderBauGroup(g){
+  const G=S.bauG;const ym=S.bau.month||curMonth();
+  const due=bauRowsFor(ym,g.id);const carried=S.bau.carry?bauCarryOver(ym,g.id):[];const all=[...carried,...due];
+  const st=bauStats(due);const status=groupStatus(ym===curMonth()?all:due);
+  let rows=bauFilter(all,{q:G.q,status:G.status});rows=applySort(rows,G,BAU_GETTERS);
+  const tasks=S.bauTasks.filter(t=>t.groupId===g.id).sort((a,b)=>(a.active===false)-(b.active===false)||(a.order??0)-(b.order??0)||a.name.localeCompare(b.name));
+  const prog=st.total?st.done/st.total*100:0;
+  return `
+  <section class="phead">
+    <div>
+      <h1 tabindex="-1" id="ptitle">${esc(g.name)}</h1>
+      <div class="status-note"><span><span class="lab">Status for ${esc(monthLabel(ym))}</span>${gbadge(status)}</span><span class="small">Calculated automatically from this group’s tasks</span></div>
+      ${g.description?`<p class="desc">${esc(g.description)}</p>`:''}
+      <dl class="info">
+        <div><dt>Owner</dt><dd>${esc(g.owner||'—')}</dd></div>
+        <div><dt>Entity</dt><dd>${esc(g.entity||'—')}</dd></div>
+        <div><dt>Active tasks</dt><dd>${tasks.filter(t=>t.active!==false).length}</dd></div>
+        <div><dt>Est. hours this month</dt><dd>${Math.round(due.filter(r=>isLive(r.c)).reduce((a,r)=>a+(Number(r.t.estHours)||0),0)*10)/10}</dd></div>
+      </dl>
+      <div class="acts"><button class="btn primary" data-action="bau-task-modal" data-g="${g.id}">${ICON.plus}Add BAU task</button><button class="btn" data-action="bau-group-modal" data-g="${g.id}">${ICON.edit}Edit group</button><button class="btn danger" data-action="bau-group-delete" data-g="${g.id}">${ICON.trash}Delete</button></div>
+    </div>
+    <div class="bigprog"><span class="small">Completed this month</span><span class="n">${st.done}/${st.total}</span><div class="bar"><i style="width:${prog}%;background:var(--s-done)"></i></div><span class="small">${st.pending?`${st.pending} pending review · `:''}${st.overdue+carried.length?`${st.overdue+carried.length} overdue`:'Nothing overdue'}</span></div>
+  </section>
+  ${monthNav(ym,carried.length)}
+  <section class="panel flush">
+    <div class="panel-h"><h2>Checklist</h2><span class="meta">${monthLabel(ym)}</span></div>
+    ${all.length?`<div class="tbar" role="search" aria-label="Filter"><input type="search" class="inp q" id="bg-q" data-set="bauG.q" placeholder="Search task, PIC or remarks" value="${esc(G.q)}" aria-label="Search"><select class="inp" id="bg-st" data-set="bauG.status" aria-label="Status">${opts([...BAU_STATUSES,'Overdue'],G.status,'All statuses')}</select>${G.q||G.status?`<button class="btn sm ghost" data-action="bau-clear" data-path="bauG">Clear</button>`:''}<span class="cnt">${plural(rows.length,'item')}</span></div>`:''}
+    ${rows.length?bauTable(rows,G,'bauG',false):emptyState(tasks.length?'Nothing due this month':'No tasks in this group yet',tasks.length?'Use the arrows to look at another month.':'Add the recurring tasks this group is responsible for.',tasks.length?'':`<button class="btn primary" data-action="bau-task-modal" data-g="${g.id}">${ICON.plus}Add BAU task</button>`)}
+  </section>
+  <section class="panel flush">
+    <div class="panel-h"><h2>Task set-up</h2><span class="meta">${plural(tasks.filter(t=>t.active!==false).length,'active task')}</span></div>
+    ${tasks.length?`<div class="tw" style="margin-top:12px"><table class="t"><thead><tr><th>Task</th><th>Frequency</th><th>Due rule</th><th>PIC</th><th>Backup</th><th>Reviewer</th><th>Est. hours</th><th>On-time</th><th>Active</th><th><span class="sr">Actions</span></th></tr></thead><tbody>
+    ${tasks.map(t=>{const h=taskHistory(t);const hs=bauStats(h.filter(c=>c.dueDate<=TODAY||isDone(c)).map(c=>({c})));return `<tr style="${t.active===false?'opacity:.55':''}"><td style="min-width:180px"><button class="pname" data-action="bau-history" data-t="${t.id}">${esc(t.name)}</button>${t.category?`<div class="small">${esc(t.category)}</div>`:''}</td><td class="small" style="min-width:120px">${esc(freqText(t))}</td><td class="small" style="min-width:170px">${esc(dueRuleText(t))}</td><td class="nowrap">${esc(t.pic||'—')}</td><td class="nowrap small">${esc(t.backupPic||'—')}</td><td class="nowrap small">${esc(t.reviewer||'—')}</td><td>${t.estHours||'—'}</td><td>${hs.onTime===null?'—':hs.onTime+'%'}</td><td>${t.active===false?'No':'Yes'}</td>
+      <td class="nowrap"><button class="iconbtn" data-action="bau-history" data-t="${t.id}" title="History" aria-label="History">${ICON.eye}</button><button class="iconbtn" data-action="bau-task-modal" data-t="${t.id}" title="Edit" aria-label="Edit ${esc(t.name)}">${ICON.edit}</button><button class="iconbtn" data-action="bau-task-delete" data-t="${t.id}" title="Delete" aria-label="Delete ${esc(t.name)}">${ICON.trash}</button></td></tr>`}).join('')}
+    </tbody></table></div>`:'<p class="small" style="padding:0 18px 16px">No tasks yet.</p>'}
+  </section>`;
+}
+function taskHistory(t,n=14){const out=[],seen=new Set();for(let k=-2;k<=n;k++){for(const r of bauRowsFor(monthAdd(curMonth(),-k))){if(r.t.id!==t.id||seen.has(r.c.period))continue;seen.add(r.c.period);out.push(r.c)}}return out.sort((a,b)=>b.dueDate.localeCompare(a.dueDate))}
+
+/* ---------- saving ---------- */
+async function saveCycle(t,p,patch){
+  const cur=cycleFor(t,p);
+  const rec={taskId:t.id,period:p,status:cur.status,preparedDate:cur.preparedDate,completedDate:cur.completedDate,reviewedBy:cur.reviewedBy,pic:cur.pic,reviewer:cur.reviewer,remarks:cur.remarks,...patch,id:cur.id};
+  const me=S.auth?.email||'';
+  if(rec.status==='Completed'){rec.completedDate=rec.completedDate||TODAY;rec.preparedDate=rec.preparedDate||rec.completedDate;if(rec.reviewer&&!rec.reviewedBy)rec.reviewedBy=me||rec.reviewer}
+  else if(rec.status==='Pending Review'){rec.preparedDate=rec.preparedDate||TODAY;rec.completedDate='';rec.reviewedBy=''}
+  else{rec.completedDate='';rec.reviewedBy='';if(rec.status==='Not Started')rec.preparedDate=''}
+  await Store.save('bauCycles',rec);
+}
+function bauGroupModal(id){
+  const g=id?groupById(id):null;const v=g||{name:'',description:'',owner:'',entity:''};
+  openModal({title:g?'Edit BAU group':'Add BAU group',body:`
+    <label class="f">Group name *<input class="inp" name="name" data-req maxlength="100" value="${esc(v.name)}" placeholder="e.g. Regulatory Reporting – Malaysian Re"></label>
+    <label class="f">Description<textarea class="inp" name="description" rows="2">${esc(v.description)}</textarea></label>
+    <div class="g2"><label class="f">Owner *<input class="inp" name="owner" data-req list="bg-own" value="${esc(v.owner)}"><datalist id="bg-own">${uniq([...allPics(),...S.bauGroups.map(x=>x.owner)]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label>
+    <label class="f">Entity<input class="inp" name="entity" list="bg-ent" value="${esc(v.entity)}" placeholder="e.g. Malaysian Re"><datalist id="bg-ent">${uniq(['MNRB Holdings','Malaysian Re','Takaful Ikhlas',...S.bauGroups.map(x=>x.entity)]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label></div>`,
+    submit:g?'Save group':'Create group',onSubmit:async f=>{const {ok,mark}=validate(f);if(!ok)return false;const fd=new FormData(f);const gv=k=>String(fd.get(k)??'').trim();
+      if(S.bauGroups.some(x=>x.id!==g?.id&&x.name.trim().toLowerCase()===gv('name').toLowerCase())){mark(f.name,'A group with this name already exists');return false}
+      const q=g?clone(g):{id:uid('g'),createdDate:TODAY,order:Date.now()};Object.assign(q,{name:gv('name'),description:gv('description'),owner:gv('owner'),entity:gv('entity')});
+      await Store.save('bauGroups',q);toast(g?'Group saved':`${q.name} created`);if(!g)go('g:'+q.id);return true}});
+}
+function bauTaskModal(id,gid){
+  const t=id?bauTaskById(id):null;
+  const v=t||{name:'',description:'',groupId:gid||(S.view.startsWith('g:')?S.view.slice(2):''),category:'',frequency:'Monthly',yearEnd:12,dueDay:10,dueBasis:'workday',dueOffset:1,pic:'',backupPic:'',reviewer:'',estHours:'',fromMonth:curMonth(),linkedProjectId:'',active:true,remarks:''};
+  if(!S.bauGroups.length){toast('Create a BAU group first.',true);bauGroupModal();return}
+  const ppl=uniq([...allPics(),...S.bauTasks.flatMap(x=>[x.pic,x.backupPic,x.reviewer]),...S.bauGroups.map(x=>x.owner)]);
+  openModal({title:t?'Edit BAU task':'Add BAU task',body:`
+    <div class="g2"><label class="f">BAU group *<select class="inp" name="groupId" data-req><option value="">Select group</option>${bauGroupsSorted().map(g=>`<option value="${g.id}" ${g.id===v.groupId?'selected':''}>${esc(g.name)}</option>`).join('')}</select></label>
+    <label class="f">Category<input class="inp" name="category" list="bau-cats" value="${esc(v.category)}" placeholder="Choose or type"><datalist id="bau-cats">${uniq([...BAU_CATS,...S.bauTasks.map(x=>x.category)]).map(c=>`<option value="${esc(c)}">`).join('')}</datalist></label></div>
+    <label class="f">Task name *<input class="inp" name="name" data-req maxlength="120" value="${esc(v.name)}" placeholder="e.g. BNM monthly statistical return"></label>
+    <label class="f">Description<textarea class="inp" name="description" rows="2">${esc(v.description)}</textarea></label>
+    <div class="g2"><label class="f">Frequency<select class="inp" name="frequency" oninput="bauPreview(this.form)">${opts(FREQS,v.frequency)}</select></label>
+    <label class="f yearend" ${v.frequency==='Monthly'?'hidden':''}>Financial year ends in<select class="inp" name="yearEnd" oninput="bauPreview(this.form)">${MONTHS_L.map((m,i)=>`<option value="${i+1}" ${Number(v.yearEnd||12)===i+1?'selected':''}>${m}</option>`).join('')}</select><span class="hint">Sets which months end each quarter / half-year / year.</span></label></div>
+    <div class="f" style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);font-weight:500">Due rule
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input class="inp" name="dueDay" type="number" min="1" max="31" value="${v.dueDay}" style="width:80px" oninput="bauPreview(this.form)" aria-label="Day number">
+        <select class="inp" name="dueBasis" style="width:auto" oninput="bauPreview(this.form)" aria-label="Day type"><option value="workday" ${v.dueBasis==='workday'?'selected':''}>working day</option><option value="day" ${v.dueBasis!=='workday'?'selected':''}>calendar day</option></select>
+        <select class="inp" name="dueOffset" style="width:auto" oninput="bauPreview(this.form)" aria-label="Which month">${[0,1,2,3,4,5,6].map(o=>`<option value="${o}" ${Number(v.dueOffset)===o?'selected':''}>${o===0?'of the period-end month':o===1?'of the following month':`${o} months after period end`}</option>`).join('')}</select>
+      </div><span class="hint" id="bau-prev"></span></div>
+    <div class="g3"><label class="f">PIC (maker) *<input class="inp" name="pic" data-req list="bau-ppl" value="${esc(v.pic)}"></label>
+    <label class="f">Backup PIC<input class="inp" name="backupPic" list="bau-ppl" value="${esc(v.backupPic)}"></label>
+    <label class="f">Reviewer (checker)<input class="inp" name="reviewer" list="bau-ppl" value="${esc(v.reviewer)}" placeholder="Leave blank if not needed"></label></div>
+    <datalist id="bau-ppl">${ppl.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+    <div class="g3"><label class="f">Est. hours per cycle<input class="inp" name="estHours" type="number" min="0" step="0.5" value="${esc(v.estHours)}"></label>
+    <label class="f">Start tracking from<input class="inp" name="fromMonth" type="month" value="${esc(v.fromMonth||'')}"></label>
+    <label class="f">Related project<select class="inp" name="linkedProjectId"><option value="">None</option>${S.projects.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}" ${p.id===v.linkedProjectId?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label></div>
+    <label class="f">Remarks<textarea class="inp" name="remarks" rows="2">${esc(v.remarks)}</textarea></label>
+    ${t?`<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" name="active" class="check" ${v.active!==false?'checked':''}> Active (untick to stop new cycles; history is kept)</label>`:''}`,
+    submit:t?'Save task':'Add task',onSubmit:async f=>{const {ok}=validate(f);if(!ok)return false;const fd=new FormData(f);const gv=k=>String(fd.get(k)??'').trim();
+      const q=t?clone(t):{id:uid('b'),createdDate:TODAY,active:true,order:Date.now()};
+      Object.assign(q,{groupId:gv('groupId'),name:gv('name'),description:gv('description'),category:gv('category'),frequency:gv('frequency')||'Monthly',yearEnd:Number(gv('yearEnd'))||12,dueDay:Math.min(31,Math.max(1,Number(gv('dueDay'))||1)),dueBasis:gv('dueBasis')||'day',dueOffset:Number(gv('dueOffset'))||0,pic:gv('pic'),backupPic:gv('backupPic'),reviewer:gv('reviewer'),estHours:gv('estHours')?Number(gv('estHours')):'',fromMonth:gv('fromMonth'),linkedProjectId:gv('linkedProjectId'),remarks:gv('remarks')});
+      if(t)q.active=!!fd.get('active');
+      await Store.save('bauTasks',q);toast(t?'BAU task saved':'BAU task added');return true}});
+  setTimeout(()=>{const f=$('#mform');if(f)bauPreview(f)},30);
+}
+window.bauPreview=function(f){
+  const el=f.querySelector('#bau-prev');if(!el)return;
+  f.querySelector('.yearend').hidden=f.frequency.value==='Monthly';
+  const t={frequency:f.frequency.value,yearEnd:f.yearEnd.value,dueDay:f.dueDay.value,dueBasis:f.dueBasis.value,dueOffset:f.dueOffset.value};
+  const nxt=[];for(let k=0;k<24&&nxt.length<2;k++){const ym=monthAdd(curMonth(),k);for(const p of periodsDueIn(t,ym))nxt.push(`${periodLabel(t,p)} → due ${fmt(dueFor(t,p))}`)}
+  el.textContent=nxt.length?`Next: ${nxt.join('; ')}${t.dueBasis==='workday'?' (skips weekends and public holidays)':''}.`:'';
+};
+function bauCycleModal(tid,p){
+  const t=bauTaskById(tid);if(!t)return;const c=cycleFor(t,p);
+  openModal({title:`${t.name} · ${periodLabel(t,p)}`,body:`
+    <p class="small" style="margin:0">${esc(groupById(t.groupId)?.name||'Ungrouped')} · due ${fmt(c.dueDate)} (${esc(dueRuleText(t))})</p>
+    <div class="g3"><label class="f">Status<select class="inp" name="status">${opts(BAU_STATUSES,c.status)}</select></label>
+    <label class="f">Prepared on<input class="inp" type="date" name="preparedDate" value="${c.preparedDate}" max="${TODAY}"></label>
+    <label class="f">Completed on<input class="inp" type="date" name="completedDate" value="${c.completedDate}" max="${TODAY}"><span class="hint">${c.reviewer?'Date the reviewer approved':'Date it was completed'}</span></label></div>
+    <div class="g2"><label class="f">PIC this cycle<input class="inp" name="pic" list="bau-ppl2" value="${esc(c.pic)}"></label>
+    <label class="f">Reviewer this cycle<input class="inp" name="reviewer" list="bau-ppl2" value="${esc(c.reviewer)}"></label></div>
+    <datalist id="bau-ppl2">${uniq([t.pic,t.backupPic,t.reviewer,...allPics()]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+    <label class="f">Remarks<textarea class="inp" name="remarks" rows="3" placeholder="e.g. Submitted via portal, ref no. …">${esc(c.remarks)}</textarea></label>
+    ${c.reviewedBy?`<p class="small" style="margin:0">Reviewed by ${esc(c.reviewedBy)}</p>`:''}`,
+    footer:`${c.status==='Pending Review'?`<button type="button" class="btn" data-action="bau-return" data-t="${t.id}" data-p="${p}">Return to preparer</button><button type="button" class="btn" data-action="bau-approve" data-t="${t.id}" data-p="${p}">Approve</button>`:''}<button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Save</button>`,
+    onSubmit:async f=>{const fd=new FormData(f);const gv=k=>String(fd.get(k)??'').trim();await saveCycle(t,p,{status:gv('status'),preparedDate:gv('preparedDate'),completedDate:gv('completedDate'),pic:gv('pic'),reviewer:gv('reviewer'),remarks:gv('remarks')});toast('Saved');return true}});
+}
+function bauHistoryModal(tid){
+  const t=bauTaskById(tid);if(!t)return;const rows=taskHistory(t);
+  const st=bauStats(rows.filter(c=>c.dueDate<=TODAY||isDone(c)).map(c=>({c})));
+  openModal({title:t.name,footer:`<button type="button" class="btn" data-action="bau-task-modal" data-t="${t.id}">${ICON.edit}Edit task</button><button type="button" class="btn primary" data-action="close-modal">Done</button>`,body:`
+    <p class="small" style="margin:0">${esc(groupById(t.groupId)?.name||'Ungrouped')} · ${esc(freqText(t))} · ${esc(dueRuleText(t))}<br>PIC ${esc(t.pic||'—')}${t.backupPic?` · backup ${esc(t.backupPic)}`:''}${t.reviewer?` · reviewer ${esc(t.reviewer)}`:''}</p>
+    <p style="margin:0"><b>On-time rate:</b> ${st.onTime===null?'—':st.onTime+'%'} <span class="small">(${plural(st.done,'completed cycle')}, ${st.overdue} overdue)</span></p>
+    ${rows.length?`<div class="tw"><table class="t"><thead><tr><th>Period</th><th>Due</th><th>Status</th><th>Completed</th><th>Schedule</th></tr></thead><tbody>${rows.slice(0,12).map(c=>`<tr><td class="nowrap">${esc(periodLabel(t,c.period))}</td><td class="nowrap">${fmt(c.dueDate)}</td><td><span class="badge c-${BCLS[c.status]}">${esc(c.status)}</span></td><td class="nowrap">${fmt(c.completedDate)}</td><td>${schedHTML(bauSched(c),false)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="small">No cycles yet.</p>'}`});
+}
+function holidaysModal(){
+  const txt=holidayList().map(h=>`${h.date} ${h.name}`).join('\n');
+  openModal({title:'Public holidays',body:`<p class="small" style="margin:0">Used to skip non-working days in “working day” due dates. One per line: <b>YYYY-MM-DD Name</b>. Pre-filled with Kuala Lumpur holidays for 2026–2027; Islamic holiday dates for 2027 are tentative, so check them against the official gazette or MNRB’s HR calendar.</p>
+    <textarea class="inp" name="list" rows="14" style="font-family:ui-monospace,Consolas,monospace;font-size:13px">${esc(txt)}</textarea>`,
+    submit:'Save holidays',onSubmit:async f=>{const bad=[];const list=[];
+      for(const line of f.list.value.split('\n').map(x=>x.trim()).filter(Boolean)){const m=/^(\d{4}-\d{2}-\d{2})\s*(.*)$/.exec(line);if(!m||isNaN(parse(m[1]))){bad.push(line);continue}list.push({date:m[1],name:m[2]||'Holiday'})}
+      if(bad.length){toast(`Check the format of: ${bad[0]}`,true);return false}
+      await saveHolidays(list);toast('Public holidays saved');return true}});
+}
+async function addBauExamples(){
+  const mk=async(g,tasks)=>{const gid=uid('g');await Store.save('bauGroups',{id:gid,createdDate:TODAY,order:Date.now(),description:'Example, edit or delete',...g});
+    for(const x of tasks)await Store.save('bauTasks',{id:uid('b'),groupId:gid,createdDate:TODAY,active:true,order:Date.now(),description:'',backupPic:'',estHours:'',fromMonth:curMonth(),linkedProjectId:'',remarks:'',yearEnd:3,dueBasis:'workday',dueOffset:1,...x});return gid};
+  const g1=await mk({name:'Regulatory Reporting',owner:'DAT',entity:'Malaysian Re'},[
+    {name:'BNM monthly statistical return',category:'Regulatory reporting',frequency:'Monthly',dueDay:10,pic:'DAT',reviewer:'Finance Manager',estHours:6},
+    {name:'Quarterly RBC regulatory submission',category:'Regulatory reporting',frequency:'Quarterly',dueDay:30,dueBasis:'day',pic:'DAT',reviewer:'Finance Manager',estHours:16}]);
+  await mk({name:'Month-end Close',owner:'DAT',entity:'MNRB Holdings'},[
+    {name:'Journal and accrual review',category:'Month-end close',frequency:'Monthly',dueDay:5,pic:'DAT',estHours:8},
+    {name:'Intercompany reconciliation',category:'Reconciliation',frequency:'Quarterly',dueDay:15,pic:'DAT',estHours:12}]);
+  await mk({name:'Financial Reporting',owner:'DAT',entity:'MNRB Holdings'},[
+    {name:'Half-yearly financial results',category:'Management reporting',frequency:'Half-yearly',dueDay:28,dueBasis:'day',dueOffset:2,pic:'DAT',reviewer:'Head of Finance',estHours:20},
+    {name:'Annual audited financial statements',category:'Audit',frequency:'Yearly',dueDay:30,dueBasis:'day',dueOffset:3,pic:'DAT',reviewer:'Head of Finance',estHours:40}]);
+  toast('Example BAU groups added. Edit them to set real PICs and reviewers.');go('g:'+g1);
+}
+
 function renderDashboard(){
   const ps=activeProjects();const rows=ps.map(p=>({p,prog:progressOf(p),od:projOverdue(p)}));
   const n=rows.length;const c=countBy(rows,r=>r.p.status);
@@ -1121,6 +1530,9 @@ function renderMain(){
   if(S.view==='add'){if(!main.querySelector('#pform'))main.innerHTML=banner+renderAdd();return}
   let html;
   if(S.view==='gantt')html=renderGantt();
+  else if(S.view==='bau')html=renderBauDashboard();
+  else if(S.view==='bauchk')html=renderBauChecklist();
+  else if(S.view.startsWith('g:')){const g=groupById(S.view.slice(2));if(!g){S.view='bau';html=renderBauDashboard()}else html=renderBauGroup(g)}
   else if(S.view.startsWith('p:')){const p=projById(S.view.slice(2));if(!p){S.view='dashboard';html=renderDashboard()}else html=renderProject(p)}
   else html=renderDashboard();
   main.innerHTML=banner+html;
@@ -1129,6 +1541,7 @@ function renderMain(){
 }
 function refresh(){renderTabs();renderMain()}
 function go(v){
+  if(S.view!==v&&areaOf(v)!==areaOf(S.view)&&S.bau)S.bau.month='';
   S.view=v;closeMore();S.moreQ='';renderTabs();$('#main').innerHTML='';renderMain();window.scrollTo(0,0);
   const t=$('#ptitle');if(t)t.focus({preventScroll:true});else $('#main').focus({preventScroll:true});
   lsSet('dat-pm-view',v);
@@ -1149,8 +1562,23 @@ document.addEventListener('click',async e=>{
     case 'auth':authAction(t.dataset.k,null);break;
     case 'auth-view':S.auth.view=t.dataset.k;S.auth.msg='';S.auth.ok='';renderMain();break;
     case 'backups':backupsModal();break;
-    case 'bk-download':{const b=window.__bk?.[+t.dataset.i];if(b)downloadJSON({exportedAt:b.createdAt,...JSON.parse(b.data)},`dat-projects-${b.id}.json`);break}
-    case 'bk-restore':{const b=window.__bk?.[+t.dataset.i];if(!b)break;const d=JSON.parse(b.data);closeModal();confirmRestore(d,`the snapshot from ${fmt(b.date)} (${b.kind})`);break}
+    case 'area':go(LAST[t.dataset.k]||(t.dataset.k==='bau'?'bau':'dashboard'));break;
+    case 'bau-month':{const k=+t.dataset.k;S.bau.month=k===0?'':monthAdd(S.bau.month||curMonth(),k);if(S.bau.month===curMonth())S.bau.month='';renderMain();break}
+    case 'bau-clear':{const st=stateFor(t.dataset.path);Object.assign(st,{q:'',grp:'',cat:'',pic:'',freq:'',status:'',focus:'',owner:''});if(t.dataset.path==='bauD')Object.assign(st,{sort:'',dir:'asc'});renderMain();break}
+    case 'bau-dchart':S.bauD.chart=t.dataset.k;renderMain();break;
+    case 'bau-focus':S.bauD.focus=S.bauD.focus===t.dataset.status?'':t.dataset.status;renderMain();break;
+    case 'bau-group-modal':bauGroupModal(t.dataset.g);break;
+    case 'bau-group-delete':{const g=groupById(t.dataset.g);if(!g)break;const ts=S.bauTasks.filter(x=>x.groupId===g.id);const cy=S.bauCycles.filter(c=>ts.some(x=>x.id===c.taskId));
+      confirmBox('Delete BAU group?',`<b>${esc(g.name)}</b> will be removed with its ${plural(ts.length,'task')} and ${plural(cy.length,'saved cycle')}. This can’t be undone.`,'Delete group',async()=>{try{for(const c of cy)await Store.remove('bauCycles',c.id);for(const x of ts)await Store.remove('bauTasks',x.id);await Store.remove('bauGroups',g.id);toast('BAU group deleted');go('bau')}catch(err){}});break}
+    case 'bau-task-modal':if($('#modalWrap').classList.contains('open'))closeModal();bauTaskModal(t.dataset.t,t.dataset.g);break;
+    case 'bau-cycle-modal':bauCycleModal(t.dataset.t,t.dataset.p);break;
+    case 'bau-history':bauHistoryModal(t.dataset.t);break;
+    case 'bau-approve':case 'bau-return':{const bt=bauTaskById(t.dataset.t);if(!bt)break;const ap=a==='bau-approve';if($('#modalWrap').classList.contains('open'))closeModal();
+      await saveCycle(bt,t.dataset.p,ap?{status:'Completed',completedDate:TODAY,reviewedBy:S.auth?.email||bt.reviewer||''}:{status:'In Progress'}).then(()=>toast(ap?'Approved':'Returned to preparer')).catch(()=>{});break}
+    case 'bau-task-delete':{const bt=bauTaskById(t.dataset.t);if(!bt)break;const cy=S.bauCycles.filter(c=>c.taskId===bt.id);
+      confirmBox('Delete BAU task?',`<b>${esc(bt.name)}</b> and its ${plural(cy.length,'saved cycle')} will be removed. To keep the history, edit the task and untick <b>Active</b> instead.`,'Delete task',async()=>{try{for(const c of cy)await Store.remove('bauCycles',c.id);await Store.remove('bauTasks',bt.id);toast('BAU task deleted')}catch(err){}});break}
+    case 'bau-examples':await addBauExamples();break;
+    case 'holidays':holidaysModal();break;
     case 'user-menu':openModal({title:'Signed in',narrow:true,body:`<p style="margin:0">You’re signed in as <b>${esc(S.auth.email)}</b>.</p>`,submit:'Sign out',onSubmit:async()=>{await authAction('signout');return true}});break;
     case 'dash-chart':S.dash.chart=t.dataset.k;renderMain();break;
     case 'dash-focus':S.dash.focus=S.dash.focus===t.dataset.status?'':t.dataset.status;renderMain();break;
@@ -1191,6 +1619,8 @@ document.addEventListener('change',async e=>{
     await Store.save('subs',s).then(()=>toast('Progress updated')).catch(()=>{});return}
   if(a==='issue-status'){const i=issueById(t.dataset.id);if(t.value==='Resolved'&&!i.resolution){t.value=i.status;issueModal({id:i.id});setTimeout(()=>{const f=$('#mform');if(f){f.status.value='Resolved';f.actualDate.value=f.actualDate.value||TODAY;f.resolution.focus()}},40);return}
     const q=clone(i);q.status=t.value;if(t.value==='Resolved')q.actualDate=q.actualDate||TODAY;else q.actualDate='';await Store.save('issues',q).then(()=>toast('Issue updated')).catch(()=>{});return}
+  if(a==='bau-done'||a==='bau-status'){const bt=S.bauTasks.find(x=>x.id===t.dataset.t);if(!bt)return;const status=a==='bau-done'?(t.checked?(cycleFor(bt,t.dataset.p).reviewer?'Pending Review':'Completed'):'Not Started'):t.value;await saveCycle(bt,t.dataset.p,{status}).then(()=>toast(status==='Completed'?'Marked completed':status==='Pending Review'?'Sent for review':'Status updated')).catch(()=>{});return}
+  if(a==='bau-carry'){S.bau.carry=t.checked;renderMain();return}
   if(t.id==='bk-file'&&t.files&&t.files[0]){const f=t.files[0];try{const d=JSON.parse(await f.text());if(!validBackup(d))throw 0;closeModal();confirmRestore(d,`the file “${f.name}”`)}catch(err){toast('This file isn’t a DAT dashboard backup.',true)}t.value='';return}
   if(t.dataset.set&&t.tagName==='SELECT'){setPath(t.dataset.set,t.value);return}
   if(t.dataset.bind){const [grp,key]=t.dataset.bind.split('.');S[grp][key]=t.value;if(grp==='gantt'&&(key==='from'||key==='to'))S.gantt.preset=S.gantt.from||S.gantt.to?'':'all';renderMain()}
