@@ -445,11 +445,13 @@ async function seedIfEmpty(db){
    Only verified addresses on ALLOWED_DOMAIN can open the data;
    the Firestore rules enforce the same check on the server.
    ========================================================= */
-const ALLOWED_DOMAIN=String(window.DAT_ALLOWED_DOMAIN||'mnrb.com.my').toLowerCase().replace(/^@/,'');
+const ALLOWED_DOMAINS=(window.DAT_ALLOWED_DOMAINS||['mnrb.com.my','malaysian-re.com.my','takaful-ikhlas.com.my']).map(d=>String(d).toLowerCase().replace(/^@/,''));
+const ALLOWED_DOMAIN=ALLOWED_DOMAINS[0];
+const DOMAIN_LIST=ALLOWED_DOMAINS.map(d=>'@'+d).join(', ').replace(/, ([^,]*)$/,' or $1');
 let AUTH=null;const UNSUBS=[];
 S.auth={state:'none',view:'signin',email:'',msg:'',ok:'',busy:false};
 function stopData(){while(UNSUBS.length){try{UNSUBS.pop()()}catch(e){}}}
-const workEmail=e=>{e=String(e||'').trim().toLowerCase();return /^[^@\s]+@[^@\s]+$/.test(e)&&e.endsWith('@'+ALLOWED_DOMAIN)};
+const workEmail=e=>{e=String(e||'').trim().toLowerCase();return /^[^@\s]+@[^@\s]+$/.test(e)&&ALLOWED_DOMAINS.some(d=>e.endsWith('@'+d))};
 function authErr(e){
   const c=e&&e.code||'';
   const m={'auth/invalid-credential':'Email or password is incorrect.','auth/wrong-password':'Email or password is incorrect.','auth/user-not-found':'Email or password is incorrect.','auth/invalid-login-credentials':'Email or password is incorrect.',
@@ -463,7 +465,7 @@ function startAuth(db,subscribe){
   AUTH=firebase.auth();S.auth.state='checking';refresh();
   AUTH.onAuthStateChanged(async u=>{
     if(!u){stopData();S.projects=[];S.subs=[];S.issues=[];S.loaded={projects:false,subs:false,issues:false};S.auth.state='out';refresh();return}
-    if(!workEmail(u.email)){S.auth.msg=`Only @${ALLOWED_DOMAIN} email addresses can use this dashboard.`;await AUTH.signOut();return}
+    if(!workEmail(u.email)){S.auth.msg=`Only ${DOMAIN_LIST} email addresses can use this dashboard.`;await AUTH.signOut();return}
     S.auth.email=u.email;
     if(!u.emailVerified){S.auth.state='verify';refresh();return}
     try{await u.getIdToken(true)}catch(e){}
@@ -477,17 +479,17 @@ async function authAction(a,form){
   try{
     A.busy=true;renderMain();
     if(a==='signin'){
-      if(!workEmail(email))throw {msg:`Use your @${ALLOWED_DOMAIN} work email.`};
+      if(!workEmail(email))throw {msg:`Use your work email (${DOMAIN_LIST}).`};
       if(!pw)throw {msg:'Enter your password.'};
       A.email=email;await AUTH.signInWithEmailAndPassword(email,pw);
     }else if(a==='signup'){
-      if(!workEmail(email))throw {msg:`Only @${ALLOWED_DOMAIN} work emails can create an account.`};
+      if(!workEmail(email))throw {msg:`Only ${DOMAIN_LIST} work emails can create an account.`};
       if(pw.length<8)throw {msg:'Use a password of at least 8 characters.'};
       if(pw!==(form.password2?.value||''))throw {msg:'The two passwords don’t match.'};
       A.email=email;const cred=await AUTH.createUserWithEmailAndPassword(email,pw);
       await cred.user.sendEmailVerification({url:authUrl()});
     }else if(a==='reset'){
-      if(!workEmail(email))throw {msg:`Enter your @${ALLOWED_DOMAIN} work email first.`};
+      if(!workEmail(email))throw {msg:`Enter your work email first (${DOMAIN_LIST}).`};
       A.email=email;await AUTH.sendPasswordResetEmail(email,{url:authUrl()});
       A.ok=`If an account exists for ${email}, a password reset email is on its way. Check Outlook, including Junk.`;A.view='signin';
     }else if(a==='resend'){
@@ -508,7 +510,7 @@ function renderAuth(){
   else if(A.state==='verify')body=`<h2>Verify your email</h2><p>We sent a verification link to <b>${esc(A.email)}</b>. Open it in Outlook, click the link, then come back here.</p><p class="small">Not in your inbox after a few minutes? Check Junk or Quarantine. It comes from a firebaseapp.com address.</p>${msg}
     <button class="btn primary wide" data-action="auth" data-k="verified" ${b}>I’ve verified my email</button>
     <div class="auth-links"><button class="linkbtn" data-action="auth" data-k="resend" ${b}>Resend email</button><button class="linkbtn" data-action="auth" data-k="signout">Use a different account</button></div>`;
-  else if(A.view==='signup')body=`<h2>Create your account</h2><p class="small">First time only. Use your @${esc(ALLOWED_DOMAIN)} email and choose a password for this dashboard. It doesn’t have to match your Windows password.</p>
+  else if(A.view==='signup')body=`<h2>Create your account</h2><p class="small">First time only. Use your work email (${esc(DOMAIN_LIST)}) and choose a password for this dashboard. It doesn’t have to match your Windows password.</p>
     <form id="authform" data-k="signup" novalidate><label class="f">Work email<input class="inp" id="au-email" name="email" type="email" autocomplete="username" value="${esc(A.email)}" placeholder="name@${esc(ALLOWED_DOMAIN)}"></label>
     <label class="f">New password<input class="inp" id="au-pw" name="password" type="password" autocomplete="new-password" placeholder="At least 8 characters"></label>
     <label class="f">Confirm password<input class="inp" id="au-pw2" name="password2" type="password" autocomplete="new-password"></label>${msg}
@@ -518,7 +520,7 @@ function renderAuth(){
     <form id="authform" data-k="reset" novalidate><label class="f">Work email<input class="inp" id="au-email" name="email" type="email" autocomplete="username" value="${esc(A.email)}" placeholder="name@${esc(ALLOWED_DOMAIN)}"></label>${msg}
     <button class="btn primary wide" type="submit" ${b}>Send reset email</button></form>
     <div class="auth-links"><button class="linkbtn" data-action="auth-view" data-k="signin">Back to sign in</button></div>`;
-  else body=`<h2>Sign in</h2><p class="small">Use your @${esc(ALLOWED_DOMAIN)} work email.</p>
+  else body=`<h2>Sign in</h2><p class="small">Use your work email: ${esc(DOMAIN_LIST)}.</p>
     <form id="authform" data-k="signin" novalidate><label class="f">Work email<input class="inp" id="au-email" name="email" type="email" autocomplete="username" value="${esc(A.email)}" placeholder="name@${esc(ALLOWED_DOMAIN)}"></label>
     <label class="f">Password<input class="inp" id="au-pw" name="password" type="password" autocomplete="current-password"></label>${msg}
     <button class="btn primary wide" type="submit" ${b}>Sign in</button></form>
