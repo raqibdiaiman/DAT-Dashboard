@@ -65,6 +65,22 @@ h1,h2,h3{margin:0;line-height:1.2}
 .tab-add:hover span.pill-add,.tab-add.active span.pill-add{background:rgba(255,255,255,.12)}
 .tab-more svg,.tab-add svg{width:15px;height:15px}
 @media (max-width:760px){.long{display:none}.brand b{display:none}.top-in{padding:0 10px;gap:2px}.tab{padding:0 10px}.tab-add .lbl{display:none}.tab-add span.pill-add{padding:5px 8px}}
+.tab-user{flex:none;align-self:center;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;font-weight:700;font-size:13px;margin-left:4px}
+.tab-user:hover{background:rgba(255,255,255,.2)}
+.tab-user[hidden]{display:none}
+body.locked .tabs,body.locked #moreBtn,body.locked #addBtn{visibility:hidden}
+.auth-wrap{min-height:70vh;display:grid;place-items:center;padding:20px 0}
+.auth-card{width:min(420px,100%);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:26px 24px;display:grid;gap:14px}
+.auth-card form{display:grid;gap:12px}
+.auth-card h2{font-size:20px;font-weight:600}
+.auth-card p{margin:0;line-height:1.55}
+.auth-brand{display:flex;gap:12px;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.mark.big{width:42px;height:42px;background:var(--nav);color:#fff;font-size:13px}
+.btn.wide{width:100%;justify-content:center;padding:10px}
+.auth-links{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font-weight:500;font-size:13.5px;text-decoration:underline;text-underline-offset:2px}
+.auth-err{color:var(--s-late);font-size:13.5px;font-weight:500}
+.auth-ok{color:var(--s-done);font-size:13.5px;font-weight:500}
 .morepanel{position:fixed;z-index:45;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(20,34,61,.18);width:min(320px,calc(100vw - 20px));max-height:min(460px,70vh);display:none;flex-direction:column}
 .morepanel.open{display:flex}
 .morepanel .ms{padding:10px;border-bottom:1px solid var(--line)}
@@ -312,6 +328,7 @@ select.ssel{appearance:none;-webkit-appearance:none;border:1px solid color-mix(i
     <div class="brand"><div class="mark" aria-hidden="true">DAT</div><b>Project Monitoring</b></div>
     <div class="tabs" id="tabs"></div>
     <button class="tab-more" id="moreBtn" aria-haspopup="true" aria-expanded="false" hidden>More <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+    <button class="tab-user" id="userBtn" data-action="user-menu" hidden title="Account">?</button>
     <button class="tab-add" id="addBtn" data-nav="add"><span class="pill-add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Add Project</span></span></button>
   </nav>
 </header>
@@ -404,6 +421,7 @@ async function connectFirebase(){
     const v='10.12.2';
     await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-app-compat.js`);
     await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-firestore-compat.js`);
+    await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-auth-compat.js`);
     if(!firebase.apps.length)firebase.initializeApp(cfg);
     return firebase.firestore();
   }catch(e){toast('Couldn’t connect to the shared database. Check config.js and your internet connection.',true);return null}
@@ -422,6 +440,146 @@ async function seedIfEmpty(db){
     await batch.commit();
   }catch(e){console.warn('Sample data not loaded',e)}
 }
+/* =========================================================
+   Work-email sign-in (Firebase Authentication, email + password)
+   Only verified addresses on ALLOWED_DOMAIN can open the data;
+   the Firestore rules enforce the same check on the server.
+   ========================================================= */
+const ALLOWED_DOMAIN=String(window.DAT_ALLOWED_DOMAIN||'mnrb.com.my').toLowerCase().replace(/^@/,'');
+let AUTH=null;const UNSUBS=[];
+S.auth={state:'none',view:'signin',email:'',msg:'',ok:'',busy:false};
+function stopData(){while(UNSUBS.length){try{UNSUBS.pop()()}catch(e){}}}
+const workEmail=e=>{e=String(e||'').trim().toLowerCase();return /^[^@\s]+@[^@\s]+$/.test(e)&&e.endsWith('@'+ALLOWED_DOMAIN)};
+function authErr(e){
+  const c=e&&e.code||'';
+  const m={'auth/invalid-credential':'Email or password is incorrect.','auth/wrong-password':'Email or password is incorrect.','auth/user-not-found':'Email or password is incorrect.','auth/invalid-login-credentials':'Email or password is incorrect.',
+    'auth/email-already-in-use':'An account with this email already exists. Sign in instead, or reset your password.','auth/weak-password':'Use a password of at least 8 characters.',
+    'auth/too-many-requests':'Too many attempts. Wait a few minutes and try again.','auth/operation-not-allowed':'Email sign-in isn’t switched on in Firebase yet (setup step 1).',
+    'auth/unauthorized-continue-uri':'This website isn’t on Firebase’s authorized domains list yet (setup step 2).','auth/unauthorized-domain':'This website isn’t on Firebase’s authorized domains list yet (setup step 2).',
+    'auth/network-request-failed':'No connection. Check your internet and try again.','auth/invalid-email':'Enter a valid email address.'};
+  return m[c]||'Something went wrong. Please try again.';
+}
+function startAuth(db,subscribe){
+  AUTH=firebase.auth();S.auth.state='checking';refresh();
+  AUTH.onAuthStateChanged(async u=>{
+    if(!u){stopData();S.projects=[];S.subs=[];S.issues=[];S.loaded={projects:false,subs:false,issues:false};S.auth.state='out';refresh();return}
+    if(!workEmail(u.email)){S.auth.msg=`Only @${ALLOWED_DOMAIN} email addresses can use this dashboard.`;await AUTH.signOut();return}
+    S.auth.email=u.email;
+    if(!u.emailVerified){S.auth.state='verify';refresh();return}
+    try{await u.getIdToken(true)}catch(e){}
+    S.auth.state='in';S.auth.msg='';refresh();seedIfEmpty(db);subscribe();
+  });
+}
+const authUrl=()=>location.origin+location.pathname;
+async function authAction(a,form){
+  const A=S.auth;A.msg='';A.ok='';
+  const email=(form?.email?.value||A.email||'').trim().toLowerCase();const pw=form?.password?.value||'';
+  try{
+    A.busy=true;renderMain();
+    if(a==='signin'){
+      if(!workEmail(email))throw {msg:`Use your @${ALLOWED_DOMAIN} work email.`};
+      if(!pw)throw {msg:'Enter your password.'};
+      A.email=email;await AUTH.signInWithEmailAndPassword(email,pw);
+    }else if(a==='signup'){
+      if(!workEmail(email))throw {msg:`Only @${ALLOWED_DOMAIN} work emails can create an account.`};
+      if(pw.length<8)throw {msg:'Use a password of at least 8 characters.'};
+      if(pw!==(form.password2?.value||''))throw {msg:'The two passwords don’t match.'};
+      A.email=email;const cred=await AUTH.createUserWithEmailAndPassword(email,pw);
+      await cred.user.sendEmailVerification({url:authUrl()});
+    }else if(a==='reset'){
+      if(!workEmail(email))throw {msg:`Enter your @${ALLOWED_DOMAIN} work email first.`};
+      A.email=email;await AUTH.sendPasswordResetEmail(email,{url:authUrl()});
+      A.ok=`If an account exists for ${email}, a password reset email is on its way. Check Outlook, including Junk.`;A.view='signin';
+    }else if(a==='resend'){
+      await AUTH.currentUser.sendEmailVerification({url:authUrl()});A.ok='Verification email sent again. Check Outlook, including Junk.';
+    }else if(a==='verified'){
+      await AUTH.currentUser.reload();
+      if(!AUTH.currentUser.emailVerified)throw {msg:'Not verified yet. Click the link in the email first, then try again.'};
+      await AUTH.currentUser.getIdToken(true);S.auth.state='in';location.reload();
+    }else if(a==='signout'){await AUTH.signOut();A.view='signin'}
+  }catch(e){A.msg=e.msg||authErr(e)}
+  finally{A.busy=false;renderMain()}
+}
+function renderAuth(){
+  const A=S.auth;const b=A.busy?'disabled':'';
+  const msg=(A.msg?`<p class="auth-err" role="alert">${esc(A.msg)}</p>`:'')+(A.ok?`<p class="auth-ok" role="status">${esc(A.ok)}</p>`:'');
+  let body;
+  if(A.state==='checking'||A.state==='none')body=`<p class="small">Checking sign-in…</p>`;
+  else if(A.state==='verify')body=`<h2>Verify your email</h2><p>We sent a verification link to <b>${esc(A.email)}</b>. Open it in Outlook, click the link, then come back here.</p><p class="small">Not in your inbox after a few minutes? Check Junk or Quarantine. It comes from a firebaseapp.com address.</p>${msg}
+    <button class="btn primary wide" data-action="auth" data-k="verified" ${b}>I’ve verified my email</button>
+    <div class="auth-links"><button class="linkbtn" data-action="auth" data-k="resend" ${b}>Resend email</button><button class="linkbtn" data-action="auth" data-k="signout">Use a different account</button></div>`;
+  else if(A.view==='signup')body=`<h2>Create your account</h2><p class="small">First time only. Use your @${esc(ALLOWED_DOMAIN)} email and choose a password for this dashboard. It doesn’t have to match your Windows password.</p>
+    <form id="authform" data-k="signup" novalidate><label class="f">Work email<input class="inp" id="au-email" name="email" type="email" autocomplete="username" value="${esc(A.email)}" placeholder="name@${esc(ALLOWED_DOMAIN)}"></label>
+    <label class="f">New password<input class="inp" id="au-pw" name="password" type="password" autocomplete="new-password" placeholder="At least 8 characters"></label>
+    <label class="f">Confirm password<input class="inp" id="au-pw2" name="password2" type="password" autocomplete="new-password"></label>${msg}
+    <button class="btn primary wide" type="submit" ${b}>Create account</button></form>
+    <div class="auth-links"><span class="small">Already have an account?</span><button class="linkbtn" data-action="auth-view" data-k="signin">Sign in</button></div>`;
+  else if(A.view==='reset')body=`<h2>Reset password</h2><p class="small">We’ll email you a link to choose a new password.</p>
+    <form id="authform" data-k="reset" novalidate><label class="f">Work email<input class="inp" id="au-email" name="email" type="email" autocomplete="username" value="${esc(A.email)}" placeholder="name@${esc(ALLOWED_DOMAIN)}"></label>${msg}
+    <button class="btn primary wide" type="submit" ${b}>Send reset email</button></form>
+    <div class="auth-links"><button class="linkbtn" data-action="auth-view" data-k="signin">Back to sign in</button></div>`;
+  else body=`<h2>Sign in</h2><p class="small">Use your @${esc(ALLOWED_DOMAIN)} work email.</p>
+    <form id="authform" data-k="signin" novalidate><label class="f">Work email<input class="inp" id="au-email" name="email" type="email" autocomplete="username" value="${esc(A.email)}" placeholder="name@${esc(ALLOWED_DOMAIN)}"></label>
+    <label class="f">Password<input class="inp" id="au-pw" name="password" type="password" autocomplete="current-password"></label>${msg}
+    <button class="btn primary wide" type="submit" ${b}>Sign in</button></form>
+    <div class="auth-links"><button class="linkbtn" data-action="auth-view" data-k="reset">Forgot password?</button><span class="small">New here?</span><button class="linkbtn" data-action="auth-view" data-k="signup">Create an account</button></div>`;
+  return `<div class="auth-wrap"><div class="auth-card"><div class="auth-brand"><div class="mark big">DAT</div><div><b>DAT Project Monitoring</b><div class="small">Data Automation Team</div></div></div>${body}</div></div>`;
+}
+/* =========================================================
+   Backups & restore
+   - A dated snapshot of all data is saved automatically inside the
+     database once a day (the first time anyone opens the app), and
+     the last 30 are kept.
+   - A snapshot is also taken right before any restore.
+   - Any snapshot or downloaded backup file can be restored.
+   ========================================================= */
+const BK='backups',BK_KEEP=30;let autoBkDone=false;
+const bkSupported=()=>S.mode==='firebase'&&S.auth.state==='in';
+function bkPayload(){return {projects:S.projects,subs:S.subs,issues:S.issues}}
+async function saveSnapshot(id,kind){
+  const data=JSON.stringify(bkPayload());
+  if(data.length>900000){toast('Data is too large for an automatic snapshot. Use Download backup instead.',true);return false}
+  await DB.collection(BK).doc(id).set({createdAt:new Date().toISOString(),date:TODAY,kind,by:S.auth.email||'',counts:{projects:S.projects.length,subs:S.subs.length,issues:S.issues.length},data});
+  return true;
+}
+async function listSnapshots(){const q=await DB.collection(BK).get();return q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))}
+async function autoBackupOnce(){
+  if(autoBkDone||!bkSupported())return;autoBkDone=true;
+  if(!S.projects.length&&!S.subs.length&&!S.issues.length)return;
+  try{
+    const id='auto-'+TODAY;const d=await DB.collection(BK).doc(id).get();if(d.exists)return;
+    await saveSnapshot(id,'Daily automatic');
+    const all=await listSnapshots();for(const old of all.slice(BK_KEEP))await DB.collection(BK).doc(old.id).delete();
+  }catch(e){console.warn('Automatic backup skipped',e)}
+}
+function validBackup(d){return d&&Array.isArray(d.projects)&&Array.isArray(d.subs)&&Array.isArray(d.issues)&&[...d.projects,...d.subs,...d.issues].every(x=>x&&typeof x.id==='string'&&x.id)}
+async function restoreData(d){
+  if(!validBackup(d))throw {msg:'This file isn’t a DAT dashboard backup.'};
+  if(S.mode==='firebase'){
+    await saveSnapshot('before-restore-'+Date.now(),'Before restore');
+    const ops=[];
+    for(const [k,coll] of Object.entries(TABLES)){
+      const keep=new Set(d[k].map(x=>x.id));
+      for(const cur of S[k])if(!keep.has(cur.id))ops.push(b=>b.delete(DB.collection(coll).doc(cur.id)));
+      for(const x of d[k]){const {id,...body}=x;ops.push(b=>b.set(DB.collection(coll).doc(id),body))}
+    }
+    for(let i=0;i<ops.length;i+=400){const b=DB.batch();ops.slice(i,i+400).forEach(f=>f(b));await b.commit()}
+  }else if(S.mode==='local'){S.projects=d.projects;S.subs=d.subs;S.issues=d.issues;saveLocal();refresh()}
+  else throw {msg:'Restore isn’t available in this version.'};
+}
+function backupsModal(){
+  const fileRow=`<div><h3 style="font-size:14px;margin:0 0 6px">Restore from a downloaded file</h3><p class="small" style="margin:0 0 8px">Choose a file saved with <b>Download backup</b>. The dashboard will be replaced with the data in that file.</p><input type="file" id="bk-file" accept=".json,application/json" class="inp"></div>`;
+  openModal({title:'Backups and restore',footer:`<button type="button" class="btn" data-action="backup">Download backup now</button><button type="button" class="btn primary" data-action="close-modal">Done</button>`,
+    body:`${bkSupported()?`<div><h3 style="font-size:14px;margin:0 0 6px">Automatic snapshots</h3><p class="small" style="margin:0 0 8px">Saved once a day and before every restore. The last ${BK_KEEP} are kept.</p><div id="bk-list"><p class="small">Loading…</p></div></div>`:''}${fileRow}`});
+  if(bkSupported())listSnapshots().then(list=>{const el=$('#bk-list');if(!el)return;window.__bk=list;
+    el.innerHTML=list.length?`<ul class="list">${list.map((b,i)=>`<li><div><b>${esc(fmt(b.date))}</b> <span class="small">${esc(new Date(b.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))} · ${esc(b.kind||'')}</span><div class="small">${b.counts?`${plural(b.counts.projects,'project')}, ${plural(b.counts.subs,'sub-project')}, ${plural(b.counts.issues,'issue')}`:''}${b.by?` · ${esc(b.by)}`:''}</div></div><span style="display:flex;gap:6px"><button class="btn sm" data-action="bk-download" data-i="${i}">Download</button><button class="btn sm" data-action="bk-restore" data-i="${i}">Restore</button></span></li>`).join('')}</ul>`:'<p class="small">No snapshots yet. The first one is saved automatically today.</p>'}).catch(()=>{const el=$('#bk-list');if(el)el.innerHTML='<p class="small" style="color:var(--s-late)">Couldn’t load snapshots. Check that the database rules include “backups” (see README).</p>'});
+}
+function confirmRestore(d,label){
+  const n=`${plural(d.projects.length,'project')}, ${plural(d.subs.length,'sub-project')} and ${plural(d.issues.length,'issue')}`;
+  confirmBox('Restore this backup?',`The dashboard for everyone will be replaced with <b>${esc(label)}</b> (${esc(n)}). ${S.mode==='firebase'?'A snapshot of the current data is saved first, so you can undo this.':''}`,'Restore',async()=>{
+    try{await restoreData(d);toast('Backup restored')}catch(e){toast(e.msg||'Restore failed. Nothing was lost; please try again.',true)}});
+}
+function downloadJSON(obj,name){const url=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 async function initData(){
   let db=null;
   try{db=(window.claude&&typeof window.claude.use==='function')?await window.claude.use('db'):null}catch(e){db=null}
@@ -430,10 +588,14 @@ async function initData(){
   if(db){
     DB=db;if(shared)S.mode='db';
     const onErr=e=>toast(e&&(e.code==='revoked'||e.code==='permission-denied')?'The shared database refused access. Check the database rules (see README).':'Lost connection to shared data. Reload to reconnect.',true);
-    if(S.mode==='firebase')seedIfEmpty(db);
-    for(const [k,coll] of Object.entries(TABLES)){
-      db.collection(coll).onSnapshot(s=>{S[k]=s.docs.map(d=>({...clone(d.data()),id:d.id}));S.loaded[k]=true;refresh()},onErr);
-    }
+    const subscribe=()=>{
+      stopData();
+      for(const [k,coll] of Object.entries(TABLES)){
+        UNSUBS.push(db.collection(coll).onSnapshot(s=>{S[k]=s.docs.map(d=>({...clone(d.data()),id:d.id}));S.loaded[k]=true;refresh();if(ready())autoBackupOnce()},onErr));
+      }
+    };
+    if(S.mode==='firebase'){startAuth(db,subscribe);return}
+    subscribe();
   }else{
     S.mode='local';
     let d=null;try{d=JSON.parse(lsGet(LS_DATA,'null'))}catch(e){}
@@ -502,6 +664,7 @@ function renderTabs(){
   tabs.innerHTML=`<button class="tab ${v==='dashboard'?'active':''}" data-nav="dashboard" ${v==='dashboard'?'aria-current="page"':''}>Dashboard</button><button class="tab ${v==='gantt'?'active':''}" data-nav="gantt" ${v==='gantt'?'aria-current="page"':''}><span class="long">Overall </span>Gantt</button>`+
     activeProjects().map(p=>`<button class="tab ptab ${v==='p:'+p.id?'active':''}" data-nav="p:${p.id}" data-pid="${p.id}" title="${esc(p.name)}" ${v==='p:'+p.id?'aria-current="page"':''}>${esc(p.name)}</button>`).join('');
   $('#addBtn').classList.toggle('active',v==='add');
+  const ub=$('#userBtn');ub.hidden=!(S.mode==='firebase'&&S.auth.state==='in');if(!ub.hidden){ub.textContent=(S.auth.email||'?')[0].toUpperCase();ub.title=`Signed in as ${S.auth.email}`;ub.setAttribute('aria-label',`Account: ${S.auth.email}`)}
   fitTabs();
 }
 let hiddenTabs=[];
@@ -597,7 +760,7 @@ function renderDashboard(){
   soon.sort((a,b)=>a.dd-b.dd);
   return `
   <header class="page-h"><div><h1>DAT portfolio dashboard</h1><p class="sub">${plural(n,'active project')} as at ${fmt(TODAY)}. Every figure here is calculated from the project tabs.</p></div>
-  <span style="display:flex;gap:8px;flex-wrap:wrap">${S.mode!=='db'?`<button class="btn" data-action="backup">Download backup</button>`:''}<button class="btn" data-action="copy-portfolio">${ICON.copy}Copy portfolio summary</button></span></header>
+  <span style="display:flex;gap:8px;flex-wrap:wrap">${S.mode!=='db'?`<button class="btn" data-action="backups">Backups</button><button class="btn" data-action="backup">Download backup</button>`:''}<button class="btn" data-action="copy-portfolio">${ICON.copy}Copy portfolio summary</button></span></header>
   ${!n?`<div class="panel">${emptyState('No projects yet','Create your first DAT project. It will get its own tab and appear here automatically.',`<button class="btn primary" data-nav="add">${ICON.plus}Add project</button>`)}</div>`:`
   <section class="kpis" aria-label="Portfolio figures">
     ${kpi('Total DAT projects',n,'Active projects','var(--nav)')}
@@ -950,6 +1113,8 @@ function renderMain(){
   if(a&&a.id&&main.contains(a)){fid=a.id;try{sel=[a.selectionStart,a.selectionEnd]}catch(e){}}
   const keep={};main.querySelectorAll('input[id],textarea[id]').forEach(x=>{if(x.type!=='date'&&x.type!=='search'&&!x.dataset.bind)keep[x.id]=x.value});
   const banner=S.mode==='local'&&ready()?`<div class="banner">Standalone mode: changes are saved in this browser only. To share one set of data with your team, fill in config.js (see README).</div>`:'';
+  const locked=S.mode==='firebase'&&S.auth.state!=='in';document.body.classList.toggle('locked',locked);
+  if(locked){main.innerHTML=renderAuth();for(const k in keep){const x=document.getElementById(k);if(x&&x.type!=='password')x.value=keep[k]}if(fid)document.getElementById(fid)?.focus();else main.querySelector('input')?.focus();return}
   if(!ready()){main.innerHTML=loadingView();return}
   if(S.view==='add'){if(!main.querySelector('#pform'))main.innerHTML=banner+renderAdd();return}
   let html;
@@ -979,6 +1144,12 @@ document.addEventListener('click',async e=>{
   if(t.tagName==='SELECT'||t.tagName==='INPUT')return;
   switch(a){
     case 'close-modal':closeModal();break;
+    case 'auth':authAction(t.dataset.k,null);break;
+    case 'auth-view':S.auth.view=t.dataset.k;S.auth.msg='';S.auth.ok='';renderMain();break;
+    case 'backups':backupsModal();break;
+    case 'bk-download':{const b=window.__bk?.[+t.dataset.i];if(b)downloadJSON({exportedAt:b.createdAt,...JSON.parse(b.data)},`dat-projects-${b.id}.json`);break}
+    case 'bk-restore':{const b=window.__bk?.[+t.dataset.i];if(!b)break;const d=JSON.parse(b.data);closeModal();confirmRestore(d,`the snapshot from ${fmt(b.date)} (${b.kind})`);break}
+    case 'user-menu':openModal({title:'Signed in',narrow:true,body:`<p style="margin:0">You’re signed in as <b>${esc(S.auth.email)}</b>.</p>`,submit:'Sign out',onSubmit:async()=>{await authAction('signout');return true}});break;
     case 'dash-chart':S.dash.chart=t.dataset.k;renderMain();break;
     case 'dash-focus':S.dash.focus=S.dash.focus===t.dataset.status?'':t.dataset.status;renderMain();break;
     case 'copy-portfolio':copy(portfolioText());break;
@@ -1018,6 +1189,7 @@ document.addEventListener('change',async e=>{
     await Store.save('subs',s).then(()=>toast('Progress updated')).catch(()=>{});return}
   if(a==='issue-status'){const i=issueById(t.dataset.id);if(t.value==='Resolved'&&!i.resolution){t.value=i.status;issueModal({id:i.id});setTimeout(()=>{const f=$('#mform');if(f){f.status.value='Resolved';f.actualDate.value=f.actualDate.value||TODAY;f.resolution.focus()}},40);return}
     const q=clone(i);q.status=t.value;if(t.value==='Resolved')q.actualDate=q.actualDate||TODAY;else q.actualDate='';await Store.save('issues',q).then(()=>toast('Issue updated')).catch(()=>{});return}
+  if(t.id==='bk-file'&&t.files&&t.files[0]){const f=t.files[0];try{const d=JSON.parse(await f.text());if(!validBackup(d))throw 0;closeModal();confirmRestore(d,`the file “${f.name}”`)}catch(err){toast('This file isn’t a DAT dashboard backup.',true)}t.value='';return}
   if(t.dataset.set&&t.tagName==='SELECT'){setPath(t.dataset.set,t.value);return}
   if(t.dataset.bind){const [grp,key]=t.dataset.bind.split('.');S[grp][key]=t.value;if(grp==='gantt'&&(key==='from'||key==='to'))S.gantt.preset=S.gantt.from||S.gantt.to?'':'all';renderMain()}
 });
@@ -1025,6 +1197,7 @@ function setPath(path,val){const i=path.lastIndexOf('.');const st=stateFor(path.
 document.addEventListener('input',e=>{if(e.target.id==='more-q'){S.moreQ=e.target.value;renderMorePanel(false)}else if(e.target.dataset.set&&e.target.tagName==='INPUT')setPath(e.target.dataset.set,e.target.value)});
 document.addEventListener('submit',async e=>{
   e.preventDefault();const f=e.target;const btn=f.querySelector('[type=submit]');
+  if(f.id==='authform'){authAction(f.dataset.k,f);return}
   if(f.id==='pform'){const p=readProjectForm(f,null);if(!p){f.querySelector('.err')?.focus();return}btn.disabled=true;
     try{await Store.save('projects',p);toast(`${p.name} created`);$('#main').innerHTML='';go('p:'+p.id)}catch(err){}finally{btn.disabled=false}return}
   if(f.id==='mform'&&modalCtx?.onSubmit){btn.disabled=true;let done=false;try{done=await modalCtx.onSubmit(f)}catch(err){done=false}if(btn.isConnected)btn.disabled=false;if(done)closeModal()}
