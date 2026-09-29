@@ -202,6 +202,19 @@ select.ssel{appearance:none;-webkit-appearance:none;border:1px solid color-mix(i
 .sch{display:inline-flex;flex-direction:column;gap:1px;line-height:1.3}
 .sch b{font-size:12.5px;font-weight:600;color:var(--c,var(--muted));white-space:nowrap}
 .sch small{font-size:11.5px;color:var(--faint);white-space:nowrap}
+.subtog{border:0;background:none;color:var(--muted);font-size:13px;padding:2px 4px;border-radius:4px;line-height:1.3;margin-top:1px}
+.subtog:hover{background:var(--surface-2);color:var(--ink)}
+.subchip{display:inline-flex;align-items:center;gap:5px;vertical-align:middle;font-size:11.5px;color:var(--muted);margin-left:4px}
+.subchip i{display:inline-block;width:34px;height:5px;border-radius:3px;background:var(--line);position:relative;overflow:hidden}
+.subchip u{position:absolute;left:0;top:0;bottom:0;background:var(--s-ip);text-decoration:none}
+.subchip.ok u{background:var(--s-done)}
+.subchip.ok b{color:var(--s-done)}
+.subrow td{background:var(--surface-2)}
+.subpanel{padding:4px 0 6px}
+.sublist{list-style:none;margin:0 0 10px;padding:0;max-width:560px}
+.sublist li{display:flex;align-items:center;gap:10px;padding:4px 0;border-bottom:1px dashed var(--line)}
+.sublist li label{display:flex;gap:8px;align-items:center;flex:1;cursor:pointer}
+.sublist li.done label span{color:var(--muted);text-decoration:line-through}
 .sch-na{--c:var(--faint)}
 .sch-early{--c:var(--s-done)}.sch-late{--c:var(--s-hold)}.sch-overdue{--c:var(--s-late)}.sch-soon{--c:var(--s-hold)}.sch-ontrack{--c:var(--muted)}.sch-done{--c:var(--s-done)}
 .status-note{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
@@ -799,6 +812,30 @@ const isDone=t=>t.status==='Completed';
 const isLive=t=>t.status!=='Not Applicable';
 const expOf=t=>t.expectedDate||'';
 const isOverdue=t=>isLive(t)&&!isDone(t)&&expOf(t)&&expOf(t)<TODAY;
+/* Sub-tasks: a simple checklist stored on the task. The task can't go to review or be completed until all are ticked. */
+const subsOfT=t=>Array.isArray(t.subtasks)?t.subtasks:[];
+const subDone=t=>subsOfT(t).filter(x=>x.done).length;
+const subOpen=t=>subsOfT(t).length-subDone(t);
+const resetSubs=t=>subsOfT(t).map(x=>({id:uid('s'),name:x.name,done:false,doneDate:''}));
+const tplOf=g=>Array.isArray(g?.template)?g.template.filter(Boolean):[];
+S.bauOpen=new Set();
+function subChip(t){const n=subsOfT(t).length;if(!n)return '';const d=subDone(t);return `<span class="subchip ${d===n?'ok':''}" title="${d} of ${n} sub-tasks done"><i><u style="width:${d/n*100}%"></u></i><b>${d}/${n}</b></span>`}
+function subPanel(t){
+  const subs=subsOfT(t);const g=groupById(t.groupId);const tpl=tplOf(g);const missing=tpl.filter(n=>!subs.some(x=>x.name.trim().toLowerCase()===n.trim().toLowerCase()));
+  return `<div class="subpanel">
+    ${subs.length?`<ul class="sublist">${subs.map(x=>`<li class="${x.done?'done':''}"><label><input type="checkbox" class="check" style="accent-color:var(--s-done)" data-action="bau-sub-toggle" data-t="${t.id}" data-s="${x.id}" ${x.done?'checked':''}><span>${esc(x.name)}</span></label><span class="small">${x.done&&x.doneDate?'Done '+fmt(x.doneDate):''}</span><button class="iconbtn" data-action="bau-sub-del" data-t="${t.id}" data-s="${x.id}" aria-label="Remove sub-task">${ICON.x}</button></li>`).join('')}</ul>`:'<p class="small" style="margin:0 0 8px">No sub-tasks yet.</p>'}
+    <div class="addrow" style="max-width:560px"><input class="inp" id="sub-add-${t.id}" placeholder="Add a sub-task" data-enter="bau-sub-add" data-id="${t.id}" data-k="x"><button class="btn sm" data-action="bau-sub-add" data-id="${t.id}" data-k="x">Add</button>${missing.length?`<button class="btn sm" data-action="bau-sub-tpl" data-t="${t.id}" title="${esc(missing.join(', '))}">Add standard sub-tasks (${missing.length})</button>`:''}</div>
+  </div>`;
+}
+async function saveSubs(t,subs,msg){
+  const q=clone(t);q.subtasks=subs;
+  if(subs.some(x=>!x.done)&&(q.status==='Completed'||q.status==='Pending Review')){q.status='In Progress';msg='Task moved back to In Progress because a sub-task is not done'}
+  await Store.save('bauTasks',normTask(q));if(msg)toast(msg);
+}
+function blockIfOpen(t,status){
+  if((status==='Completed'||status==='Pending Review')&&subOpen(t)){toast(`Finish all sub-tasks first (${subDone(t)} of ${subsOfT(t).length} done).`,true);S.bauOpen.add(t.id);renderMain();return true}
+  return false;
+}
 function bauSched(t){
   if(t.status==='Not Applicable')return {k:'na',txt:'Not applicable',sub:'',n:null};
   if(!expOf(t))return {k:'ontrack',txt:'No expected date',sub:'',n:null};
@@ -864,7 +901,7 @@ function bauTable(rows,st,path,showGroup){
   ${rows.map(({t,carried})=>`<tr ${sel.on&&sel.ids.has(t.id)?'style="background:var(--accent-soft)"':''}>
     <td>${sel.on?`<input type="checkbox" class="check" style="accent-color:var(--accent)" data-action="bau-sel" data-t="${t.id}" ${sel.ids.has(t.id)?'checked':''} aria-label="Select ${esc(t.name)}">`
       :`<input type="checkbox" class="check" style="accent-color:var(--s-done)" data-action="bau-done" data-t="${t.id}" ${isDone(t)||t.status==='Pending Review'?'checked':''} ${t.status==='Not Applicable'?'disabled':''} aria-label="Mark ${esc(t.name)} done" title="${t.reviewer?'Tick when prepared; the reviewer then approves':'Tick when completed'}">`}</td>
-    <td style="min-width:200px"><button class="pname" data-action="bau-task-modal" data-t="${t.id}">${esc(t.name)}</button><div class="small">${esc([t.category,t.frequency].filter(Boolean).join(' · '))}</div>${carried?`<div><span class="pill">From ${esc(monthLabel(expOf(t).slice(0,7)))}</span></div>`:''}</td>
+    <td style="min-width:220px"><div style="display:flex;gap:6px;align-items:flex-start"><button class="subtog" data-action="bau-sub-open" data-t="${t.id}" aria-expanded="${S.bauOpen.has(t.id)}" title="${S.bauOpen.has(t.id)?'Hide':'Show'} sub-tasks" aria-label="Sub-tasks of ${esc(t.name)}">${S.bauOpen.has(t.id)?'▾':'▸'}</button><div><button class="pname" data-action="bau-task-modal" data-t="${t.id}">${esc(t.name)}</button> ${subChip(t)}<div class="small">${esc([t.category,t.frequency].filter(Boolean).join(' · '))}</div>${carried?`<div><span class="pill">From ${esc(monthLabel(expOf(t).slice(0,7)))}</span></div>`:''}</div></div></td>
     ${showGroup?`<td style="min-width:140px">${groupById(t.groupId)?`<button class="pname" data-nav="g:${t.groupId}" style="font-weight:500">${esc(groupById(t.groupId).name)}</button>`:'<span class="small">Ungrouped</span>'}</td>`:''}
     <td class="nowrap small">${esc(t.period||'—')}</td>
     <td class="nowrap">${expOf(t)?fmt(expOf(t)):'<span class="pill q">Set date</span>'}</td>
@@ -874,7 +911,7 @@ function bauTable(rows,st,path,showGroup){
     <td>${schedHTML(bauSched(t),t.status==='Pending Review')}</td>
     <td class="small" style="min-width:150px">${esc(t.remarks)||'—'}</td>
     <td class="nowrap"><button class="iconbtn" data-action="bau-task-modal" data-t="${t.id}" title="Edit" aria-label="Edit ${esc(t.name)}">${ICON.edit}</button><button class="iconbtn" data-action="bau-dup" data-t="${t.id}" title="Duplicate" aria-label="Duplicate ${esc(t.name)}">${ICON.copy}</button><button class="iconbtn" data-action="bau-task-delete" data-t="${t.id}" title="Delete" aria-label="Delete ${esc(t.name)}">${ICON.trash}</button></td>
-  </tr>`).join('')}</tbody></table></div>`;
+  </tr>${S.bauOpen.has(t.id)?`<tr class="subrow"><td></td><td colspan="${showGroup?11:10}">${subPanel(t)}</td></tr>`:''}`).join('')}</tbody></table></div>`;
 }
 const bkpi=(l,v,sub,k,warn)=>`<div class="kpi" style="--k:${k}"><span class="l">${l}</span><span class="n">${v}</span>${sub?`<span class="pc ${warn?'w':''}">${sub}</span>`:''}</div>`;
 
@@ -909,7 +946,7 @@ function renderBauDashboard(){
       ${chartBlock(counts,gRows.length,D.chart,D.focus,'bau-focus',GSTATUS,GCLS)}
       <p class="small" style="margin:12px 0 0">Overdue: a task is past its expected completion date. At risk: something is due within 3 days. Select a status to filter the table below.</p></section>
     <section class="panel"><div class="panel-h"><h2>Reminders</h2><span class="meta">Overdue and due in the next 7 days</span></div>
-      ${remind.length?`<ul class="list">${remind.slice(0,8).map(t=>{const dd=diffDays(TODAY,expOf(t));return `<li><div><button class="l1" data-action="bau-task-modal" data-t="${t.id}">${esc(t.name)}</button><div class="small">${esc(groupById(t.groupId)?.name||'Ungrouped')}${t.period?' · '+esc(t.period):''} · ${esc(t.pic||'—')}${t.status==='Pending Review'?' · awaiting review':''}</div></div><div style="text-align:right"><div class="nowrap small">${fmt(expOf(t))}</div>${dd<0?`<span class="pill">${plural(-dd,'day')} overdue</span>`:`<span class="pill ${dd>3?'q':''}">${dd===0?'Due today':'in '+plural(dd,'day')}</span>`}</div></li>`}).join('')}</ul>${remind.length>8?`<p class="small" style="margin:8px 0 0">+${remind.length-8} more in the <button class="linkbtn" data-nav="bauchk">checklist</button></p>`:''}`:emptyState('Nothing overdue or due this week','')}
+      ${remind.length?`<ul class="list">${remind.slice(0,8).map(t=>{const dd=diffDays(TODAY,expOf(t));return `<li><div><button class="l1" data-action="bau-task-modal" data-t="${t.id}">${esc(t.name)}</button><div class="small">${esc(groupById(t.groupId)?.name||'Ungrouped')}${t.period?' · '+esc(t.period):''} · ${esc(t.pic||'—')}${t.status==='Pending Review'?' · awaiting review':''}${subsOfT(t).length?` · ${subDone(t)}/${subsOfT(t).length} sub-tasks`:''}</div></div><div style="text-align:right"><div class="nowrap small">${fmt(expOf(t))}</div>${dd<0?`<span class="pill">${plural(-dd,'day')} overdue</span>`:`<span class="pill ${dd>3?'q':''}">${dd===0?'Due today':'in '+plural(dd,'day')}</span>`}</div></li>`}).join('')}</ul>${remind.length>8?`<p class="small" style="margin:8px 0 0">+${remind.length-8} more in the <button class="linkbtn" data-nav="bauchk">checklist</button></p>`:''}`:emptyState('Nothing overdue or due this week','')}
     </section>
   </div>
   <section class="panel flush">
@@ -1011,10 +1048,11 @@ function bauGroupModal(id){
     <label class="f">Group name *<input class="inp" name="name" data-req maxlength="100" value="${esc(v.name)}" placeholder="e.g. Regulatory Reporting – Malaysian Re"></label>
     <label class="f">Description<textarea class="inp" name="description" rows="2">${esc(v.description)}</textarea></label>
     <div class="g2"><label class="f">Owner *<input class="inp" name="owner" data-req list="bg-own" value="${esc(v.owner)}"><datalist id="bg-own">${uniq([...allPics(),...S.bauGroups.map(x=>x.owner)]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label>
-    <label class="f">Entity<input class="inp" name="entity" list="bg-ent" value="${esc(v.entity)}" placeholder="e.g. Malaysian Re"><datalist id="bg-ent">${uniq(['MNRB Holdings','Malaysian Re','Takaful Ikhlas',...S.bauGroups.map(x=>x.entity)]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label></div>`,
+    <label class="f">Entity<input class="inp" name="entity" list="bg-ent" value="${esc(v.entity)}" placeholder="e.g. Malaysian Re"><datalist id="bg-ent">${uniq(['MNRB Holdings','Malaysian Re','Takaful Ikhlas',...S.bauGroups.map(x=>x.entity)]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label></div>
+    <label class="f">Standard sub-tasks (template)<textarea class="inp" name="template" rows="5" placeholder="One per line, e.g.&#10;Extract UW data from system&#10;Reconcile premium to GL&#10;Prepare submission template&#10;Obtain sign-off">${esc(tplOf(v).join('\n'))}</textarea><span class="hint">Added to new tasks in this group, and available via “Add standard sub-tasks” on any task.</span></label>`,
     submit:g?'Save group':'Create group',onSubmit:async f=>{const {ok,mark}=validate(f);if(!ok)return false;const fd=new FormData(f);const gv=k=>String(fd.get(k)??'').trim();
       if(S.bauGroups.some(x=>x.id!==g?.id&&x.name.trim().toLowerCase()===gv('name').toLowerCase())){mark(f.name,'A group with this name already exists');return false}
-      const q=g?clone(g):{id:uid('g'),createdDate:TODAY,order:Date.now()};Object.assign(q,{name:gv('name'),description:gv('description'),owner:gv('owner'),entity:gv('entity')});
+      const q=g?clone(g):{id:uid('g'),createdDate:TODAY,order:Date.now()};Object.assign(q,{name:gv('name'),description:gv('description'),owner:gv('owner'),entity:gv('entity'),template:String(fd.get('template')||'').split('\n').map(x=>x.trim()).filter(Boolean)});
       await Store.save('bauGroups',q);toast(g?'Group saved':`${q.name} created`);if(!g)go('g:'+q.id);return true}});
 }
 /* Move a date forward by whole months. A month-end date stays month-end (30 Sep → 31 Dec). */
@@ -1046,6 +1084,7 @@ function bauTaskModal(id,gid,mode){
     <label class="f">Related project<select class="inp" name="linkedProjectId"><option value="">None</option>${S.projects.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}" ${p.id===v.linkedProjectId?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label></div>
     <label class="f">Description<textarea class="inp" name="description" rows="2">${esc(v.description)}</textarea></label>
     <label class="f">Remarks<textarea class="inp" name="remarks" rows="2" placeholder="e.g. Submitted via portal, ref no. …">${esc(v.remarks)}</textarea></label>
+    ${mode==='new'?`<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" name="useTpl" class="check" checked> Add the group’s standard sub-tasks</label>`:`<p class="small" style="margin:0">Sub-tasks: ${subsOfT(v).length?`${mode==='dup'?`${subsOfT(v).length} will be copied (unticked)`:`${subDone(v)} of ${subsOfT(v).length} done`}`:'none'} · manage them with the ▸ arrow on the task row.</p>`}
     ${mode==='edit'&&v.reviewedBy?`<p class="small" style="margin:0">Reviewed by ${esc(v.reviewedBy)}${v.preparedDate?` · prepared ${fmt(v.preparedDate)}`:''}</p>`:''}`,
     footer:`${mode==='edit'&&src.status==='Pending Review'?`<button type="button" class="btn" data-action="bau-return" data-t="${src.id}">Return to preparer</button><button type="button" class="btn" data-action="bau-approve" data-t="${src.id}">Approve</button>`:''}${mode==='edit'?`<button type="button" class="btn" data-action="bau-dup" data-t="${src.id}">${ICON.copy}Duplicate</button>`:''}<button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">${mode==='edit'?'Save task':mode==='dup'?'Create copy':'Add task'}</button>`,
     onSubmit:async f=>{const {ok,mark}=validate(f);if(!ok)return false;const fd=new FormData(f);const gv=k=>String(fd.get(k)??'').trim();
@@ -1053,6 +1092,9 @@ function bauTaskModal(id,gid,mode){
       const q=mode==='edit'?clone(src):{id:uid('b'),createdDate:TODAY,order:Date.now()};
       Object.assign(q,{groupId:gv('groupId'),name:gv('name'),period:gv('period'),frequency:gv('frequency'),category:gv('category'),expectedDate:gv('expectedDate'),completedDate:gv('completedDate'),status:gv('status')||'Not Started',pic:gv('pic'),backupPic:gv('backupPic'),reviewer:gv('reviewer'),estHours:gv('estHours')?Number(gv('estHours')):'',linkedProjectId:gv('linkedProjectId'),description:gv('description'),remarks:gv('remarks')});
       if(q.completedDate&&q.status!=='Completed'&&q.status!=='Pending Review')q.status='Completed';
+      if(mode==='dup')q.subtasks=resetSubs(src);
+      if(mode==='new')q.subtasks=fd.get('useTpl')?tplOf(groupById(q.groupId)).map(n=>({id:uid('s'),name:n,done:false,doneDate:''})):[];
+      if((q.status==='Completed'||q.status==='Pending Review')&&subOpen(q)){mark(f.status,`Finish all sub-tasks first (${subDone(q)} of ${subsOfT(q).length} done)`);return false}
       if(mode!=='edit'){q.preparedDate='';q.reviewedBy=''}
       await Store.save('bauTasks',normTask(q));if(mode!=='edit'&&q.expectedDate){const ym=q.expectedDate.slice(0,7);S.bau.month=ym===curMonth()?'':ym;renderMain()}toast(mode==='edit'?'BAU task saved':mode==='dup'?`Copy created under ${monthLabel(q.expectedDate.slice(0,7))}`:'BAU task added');return true}});
 }
@@ -1060,7 +1102,7 @@ function bauDupManyModal(ids,title){
   const ts=ids.map(bauTaskById).filter(Boolean);if(!ts.length){toast('Nothing to duplicate.',true);return}
   const freqs=uniq(ts.map(t=>t.frequency));const guess=freqs.length===1?({Monthly:1,Quarterly:3,'Half-yearly':6,Yearly:12}[freqs[0]]||0):0;
   openModal({title:title||`Duplicate ${plural(ts.length,'task')}`,body:`
-    <p class="small" style="margin:0">Copies keep the same group, PIC and reviewer. Status is reset to Not Started; actual completion and remarks are cleared.</p>
+    <p class="small" style="margin:0">Copies keep the same group, PIC, reviewer and sub-tasks. Status is reset to Not Started, sub-tasks are unticked, and actual completion and remarks are cleared.</p>
     <ul class="list" style="max-height:170px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:0 10px">${ts.map(t=>`<li><span>${esc(t.name)}</span><span class="small nowrap">${fmt(expOf(t))}</span></li>`).join('')}</ul>
     <label class="f">Move expected dates forward by<select class="inp" name="shift" onchange="bauDupPreview(this.form)">${[[0,'Don’t change dates'],[1,'1 month'],[2,'2 months'],[3,'3 months (next quarter)'],[6,'6 months (next half-year)'],[12,'12 months (next year)']].map(([k,l])=>`<option value="${k}" ${k===guess?'selected':''}>${l}</option>`).join('')}</select><span class="hint" id="dupm-prev"></span></label>
     <div style="display:grid;gap:8px"><b style="font-size:13.5px">Rename the copies (optional)</b>
@@ -1078,7 +1120,7 @@ function bauDupManyModal(ids,title){
 function dupPlan(ts,f){
   const k=Number(f.shift.value)||0;const pairs=[[f.f1.value,f.r1.value],[f.f2.value,f.r2.value]].filter(([a])=>a);
   const sw=s=>pairs.reduce((acc,[a,b])=>String(acc||'').split(a).join(b),s||'');
-  return ts.map(t=>({...clone(t),id:uid('b'),createdDate:TODAY,order:Date.now(),name:sw(t.name),period:sw(t.period),expectedDate:shiftDate(t.expectedDate,k),status:'Not Started',completedDate:'',preparedDate:'',reviewedBy:'',remarks:''}));
+  return ts.map(t=>({...clone(t),id:uid('b'),createdDate:TODAY,order:Date.now(),name:sw(t.name),period:sw(t.period),expectedDate:shiftDate(t.expectedDate,k),status:'Not Started',completedDate:'',preparedDate:'',reviewedBy:'',remarks:'',subtasks:resetSubs(t)}));
 }
 window.bauDupPreview=function(f){
   const ts=window.__dupTs||[];const plan=dupPlan(ts,f);const el=f.querySelector('#dupm-list');if(!el)return;
@@ -1089,9 +1131,9 @@ window.bauDupPreview=function(f){
 async function addBauExamples(){
   const m0=curMonth(),m1=monthAdd(m0,1);const d=(ym,day)=>`${ym}-${pad(day)}`;
   const mk=async(g,tasks)=>{const gid=uid('g');await Store.save('bauGroups',{id:gid,createdDate:TODAY,order:Date.now(),description:'Example, edit or delete',...g});
-    for(const x of tasks)await Store.save('bauTasks',normTask({id:uid('b'),groupId:gid,createdDate:TODAY,order:Date.now(),description:'',backupPic:'',estHours:'',linkedProjectId:'',remarks:'',completedDate:'',preparedDate:'',status:'Not Started',reviewer:'',...x}));return gid};
+    for(const x of tasks)await Store.save('bauTasks',normTask({subtasks:(g.template||[]).map(n=>({id:uid('s'),name:n,done:false,doneDate:''})),id:uid('b'),groupId:gid,createdDate:TODAY,order:Date.now(),description:'',backupPic:'',estHours:'',linkedProjectId:'',remarks:'',completedDate:'',preparedDate:'',status:'Not Started',reviewer:'',...x}));return gid};
   const pm=monShort(monthAdd(m0,-1));
-  const g1=await mk({name:'Regulatory Reporting',owner:'DAT',entity:'Malaysian Re'},[
+  const g1=await mk({name:'Regulatory Reporting',owner:'DAT',entity:'Malaysian Re',template:['Extract data from source system','Reconcile to GL','Prepare submission template','Reviewer sign-off']},[
     {name:`BNM monthly statistical return – ${pm}`,period:pm,frequency:'Monthly',category:'Regulatory reporting',expectedDate:d(m0,14),pic:'DAT',reviewer:'Finance Manager',estHours:6},
     {name:'Quarterly RBC submission – Q3 2026',period:'Q3 2026',frequency:'Quarterly',category:'Regulatory reporting',expectedDate:d(m0,30),pic:'DAT',reviewer:'Finance Manager',estHours:16}]);
   await mk({name:'Month-end Close',owner:'DAT',entity:'MNRB Holdings'},[
@@ -1543,8 +1585,12 @@ document.addEventListener('click',async e=>{
     case 'bau-sel-mode':S.bauSel={on:!S.bauSel.on,ids:new Set()};renderMain();break;
     case 'bau-sel-all':{const box=[...document.querySelectorAll('[data-action="bau-sel"]')];const allOn=box.every(b=>S.bauSel.ids.has(b.dataset.t));box.forEach(b=>allOn?S.bauSel.ids.delete(b.dataset.t):S.bauSel.ids.add(b.dataset.t));renderMain();break}
     case 'bau-dup-many':bauDupManyModal([...S.bauSel.ids]);break;
+    case 'bau-sub-open':{const id=t.dataset.t;S.bauOpen.has(id)?S.bauOpen.delete(id):S.bauOpen.add(id);renderMain();if(S.bauOpen.has(id))$(`#sub-add-${id}`)?.focus();break}
+    case 'bau-sub-add':{const bt=bauTaskById(t.dataset.id);const inp=$(`#sub-add-${t.dataset.id}`);const name=(inp?.value||'').trim();if(!bt||!name){inp?.focus();break}inp.value='';await saveSubs(bt,[...subsOfT(bt),{id:uid('s'),name,done:false,doneDate:''}]).catch(()=>{});$(`#sub-add-${t.dataset.id}`)?.focus();break}
+    case 'bau-sub-del':{const bt=bauTaskById(t.dataset.t);if(!bt)break;await saveSubs(bt,subsOfT(bt).filter(x=>x.id!==t.dataset.s)).catch(()=>{});break}
+    case 'bau-sub-tpl':{const bt=bauTaskById(t.dataset.t);if(!bt)break;const have=subsOfT(bt);const add=tplOf(groupById(bt.groupId)).filter(n=>!have.some(x=>x.name.trim().toLowerCase()===n.trim().toLowerCase())).map(n=>({id:uid('s'),name:n,done:false,doneDate:''}));await saveSubs(bt,[...have,...add],`${plural(add.length,'sub-task')} added`).catch(()=>{});break}
     case 'bau-dup-group':{const g=groupById(t.dataset.g);if(!g)break;const ym=S.bau.month||curMonth();const ids=bauRowsFor(ym,g.id).map(r=>r.t.id);bauDupManyModal(ids,`Duplicate ${g.name} – ${ym==='all'?'all tasks':monthLabel(ym)}`);break}
-    case 'bau-approve':case 'bau-return':{const bt=bauTaskById(t.dataset.t);if(!bt)break;const ap=a==='bau-approve';if($('#modalWrap').classList.contains('open'))closeModal();
+    case 'bau-approve':case 'bau-return':{const bt=bauTaskById(t.dataset.t);if(!bt)break;const ap=a==='bau-approve';if($('#modalWrap').classList.contains('open'))closeModal();if(ap&&blockIfOpen(bt,'Completed'))break;
       await saveTaskPatch(bt,ap?{status:'Completed',completedDate:TODAY,reviewedBy:S.auth?.email||bt.reviewer||''}:{status:'In Progress'}).then(()=>toast(ap?'Approved':'Returned to preparer')).catch(()=>{});break}
     case 'bau-task-delete':{const bt=bauTaskById(t.dataset.t);if(!bt)break;
       confirmBox('Delete BAU task?',`<b>${esc(bt.name)}</b> will be removed. This can’t be undone.`,'Delete task',async()=>{try{await Store.remove('bauTasks',bt.id);toast('BAU task deleted')}catch(err){}});break}
@@ -1589,7 +1635,8 @@ document.addEventListener('change',async e=>{
     await Store.save('subs',s).then(()=>toast('Progress updated')).catch(()=>{});return}
   if(a==='issue-status'){const i=issueById(t.dataset.id);if(t.value==='Resolved'&&!i.resolution){t.value=i.status;issueModal({id:i.id});setTimeout(()=>{const f=$('#mform');if(f){f.status.value='Resolved';f.actualDate.value=f.actualDate.value||TODAY;f.resolution.focus()}},40);return}
     const q=clone(i);q.status=t.value;if(t.value==='Resolved')q.actualDate=q.actualDate||TODAY;else q.actualDate='';await Store.save('issues',q).then(()=>toast('Issue updated')).catch(()=>{});return}
-  if(a==='bau-done'||a==='bau-status'){const bt=bauTaskById(t.dataset.t);if(!bt)return;const status=a==='bau-done'?(t.checked?(bt.reviewer?'Pending Review':'Completed'):'Not Started'):t.value;await saveTaskPatch(bt,{status}).then(()=>toast(status==='Completed'?'Marked completed':status==='Pending Review'?'Sent for review':'Status updated')).catch(()=>{});return}
+  if(a==='bau-done'||a==='bau-status'){const bt=bauTaskById(t.dataset.t);if(!bt)return;const status=a==='bau-done'?(t.checked?(bt.reviewer?'Pending Review':'Completed'):'Not Started'):t.value;if(blockIfOpen(bt,status)){if(a==='bau-done')t.checked=false;else t.value=bt.status||'Not Started';return}await saveTaskPatch(bt,{status}).then(()=>toast(status==='Completed'?'Marked completed':status==='Pending Review'?'Sent for review':'Status updated')).catch(()=>{});return}
+  if(a==='bau-sub-toggle'){const bt=bauTaskById(t.dataset.t);if(!bt)return;const subs=subsOfT(bt).map(x=>x.id===t.dataset.s?{...x,done:t.checked,doneDate:t.checked?TODAY:''}:x);await saveSubs(bt,subs).catch(()=>{});return}
   if(a==='bau-sel'){t.checked?S.bauSel.ids.add(t.dataset.t):S.bauSel.ids.delete(t.dataset.t);renderMain();return}
   if(a==='bau-carry'){S.bau.carry=t.checked;renderMain();return}
   if(t.id==='bk-file'&&t.files&&t.files[0]){const f=t.files[0];try{const d=JSON.parse(await f.text());if(!validBackup(d))throw 0;closeModal();confirmRestore(d,`the file “${f.name}”`)}catch(err){toast('This file isn’t a DAT dashboard backup.',true)}t.value='';return}
