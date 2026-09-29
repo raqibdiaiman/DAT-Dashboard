@@ -983,7 +983,7 @@ function renderBauGroup(g){
         <div><dt>Total tasks</dt><dd>${tasks.length}</dd></div>
         <div><dt>Est. hours ${ym==='all'?'(all)':'this month'}</dt><dd>${Math.round(due.map(r=>r.t).filter(isLive).reduce((a,t)=>a+(Number(t.estHours)||0),0)*10)/10}</dd></div>
       </dl>
-      <div class="acts"><button class="btn primary" data-action="bau-task-modal" data-g="${g.id}">${ICON.plus}Add BAU task</button><button class="btn" data-action="bau-group-modal" data-g="${g.id}">${ICON.edit}Edit group</button><button class="btn danger" data-action="bau-group-delete" data-g="${g.id}">${ICON.trash}Delete</button></div>
+      <div class="acts"><button class="btn primary" data-action="bau-task-modal" data-g="${g.id}">${ICON.plus}Add BAU task</button><button class="btn" data-action="bau-dup-group" data-g="${g.id}">${ICON.copy}Duplicate ${ym==='all'?'all':'this month’s'} tasks</button><button class="btn" data-action="bau-group-modal" data-g="${g.id}">${ICON.edit}Edit group</button><button class="btn danger" data-action="bau-group-delete" data-g="${g.id}">${ICON.trash}Delete</button></div>
     </div>
     <div class="bigprog"><span class="small">Completed ${ym==='all'?'overall':'in '+esc(monthLabel(ym))}</span><span class="n">${st.done}/${st.total}</span><div class="bar"><i style="width:${prog}%;background:var(--s-done)"></i></div><span class="small">${st.pending?`${st.pending} pending review · `:''}${od?`${od} overdue`:'Nothing overdue'}</span></div>
   </section>
@@ -1017,6 +1017,9 @@ function bauGroupModal(id){
       const q=g?clone(g):{id:uid('g'),createdDate:TODAY,order:Date.now()};Object.assign(q,{name:gv('name'),description:gv('description'),owner:gv('owner'),entity:gv('entity')});
       await Store.save('bauGroups',q);toast(g?'Group saved':`${q.name} created`);if(!g)go('g:'+q.id);return true}});
 }
+/* Move a date forward by whole months. A month-end date stays month-end (30 Sep → 31 Dec). */
+function shiftDate(d,k){if(!d||!k)return d;const [y,m,dd]=d.split('-').map(Number);const lastSrc=new Date(y,m,0).getDate();const t=new Date(y,m-1+Number(k),1);const lastT=new Date(t.getFullYear(),t.getMonth()+1,0).getDate();return iso(new Date(t.getFullYear(),t.getMonth(),dd===lastSrc?lastT:Math.min(dd,lastT)))}
+window.bauShift=function(f,k){const e=f.expectedDate;if(!e.value){toast('Set an expected date first.',true);return}e.value=shiftDate(e.value,k);const n=f.querySelector('#dup-when');if(n)n.textContent=`Will appear under ${monthLabel(e.value.slice(0,7))}.`};
 /* mode: 'edit' (id), 'new' (gid), 'dup' (id = source) */
 function bauTaskModal(id,gid,mode){
   if(!S.bauGroups.length){toast('Create a BAU group first.',true);bauGroupModal();return}
@@ -1031,7 +1034,8 @@ function bauTaskModal(id,gid,mode){
     <label class="f">Task name *<input class="inp" name="name" data-req maxlength="140" value="${esc(v.name)}" placeholder="e.g. BNM monthly statistical return – Sep 2026"></label>
     <div class="g2"><label class="f">Period<input class="inp" name="period" maxlength="40" value="${esc(v.period)}" placeholder="e.g. Sep 2026, Q3 2026, FY2026"></label>
     <label class="f">Frequency<select class="inp" name="frequency">${opts(FREQS,v.frequency||'Monthly')}</select></label></div>
-    <div class="g3"><label class="f">Expected completion *<input class="inp" type="date" name="expectedDate" data-req value="${esc(v.expectedDate||'')}"></label>
+    ${mode==='dup'?`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="small" style="font-weight:600;color:var(--ink)">Move expected date forward:</span>${[1,3,6,12].map(k=>`<button type="button" class="btn sm" onclick="bauShift(this.form,${k})">+${k} month${k>1?'s':''}</button>`).join('')}<span class="hint" id="dup-when"></span></div>`:''}
+    <div class="g3"><label class="f">Expected completion *<input class="inp" type="date" name="expectedDate" data-req value="${esc(v.expectedDate||'')}" oninput="const n=this.form.querySelector('#dup-when');if(n&&this.value)n.textContent='Will appear under '+monthLabel(this.value.slice(0,7))+'.'"></label>
     <label class="f">Actual completion<input class="inp" type="date" name="completedDate" value="${esc(v.completedDate||'')}" max="${TODAY}"><span class="hint">${'Filled in automatically when Completed'}</span></label>
     <label class="f">Status<select class="inp" name="status" onchange="const a=this.form.completedDate;if(this.value==='Completed'){if(!a.value)a.value='${TODAY}'}else a.value=''">${opts(BAU_STATUSES,v.status||'Not Started')}</select></label></div>
     <div class="g3"><label class="f">PIC (maker) *<input class="inp" name="pic" data-req list="bau-ppl" value="${esc(v.pic)}"></label>
@@ -1050,20 +1054,38 @@ function bauTaskModal(id,gid,mode){
       Object.assign(q,{groupId:gv('groupId'),name:gv('name'),period:gv('period'),frequency:gv('frequency'),category:gv('category'),expectedDate:gv('expectedDate'),completedDate:gv('completedDate'),status:gv('status')||'Not Started',pic:gv('pic'),backupPic:gv('backupPic'),reviewer:gv('reviewer'),estHours:gv('estHours')?Number(gv('estHours')):'',linkedProjectId:gv('linkedProjectId'),description:gv('description'),remarks:gv('remarks')});
       if(q.completedDate&&q.status!=='Completed'&&q.status!=='Pending Review')q.status='Completed';
       if(mode!=='edit'){q.preparedDate='';q.reviewedBy=''}
-      await Store.save('bauTasks',normTask(q));toast(mode==='edit'?'BAU task saved':mode==='dup'?'Copy created':'BAU task added');return true}});
+      await Store.save('bauTasks',normTask(q));if(mode!=='edit'&&q.expectedDate){const ym=q.expectedDate.slice(0,7);S.bau.month=ym===curMonth()?'':ym;renderMain()}toast(mode==='edit'?'BAU task saved':mode==='dup'?`Copy created under ${monthLabel(q.expectedDate.slice(0,7))}`:'BAU task added');return true}});
 }
-function bauDupManyModal(ids){
-  const ts=ids.map(bauTaskById).filter(Boolean);if(!ts.length)return;
-  openModal({title:`Duplicate ${plural(ts.length,'task')}`,body:`
-    <p class="small" style="margin:0">Copies keep the same group, PIC, reviewer and dates. Status is reset to Not Started and actual completion is cleared. You can edit each copy afterwards.</p>
-    <ul class="list" style="max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:0 10px">${ts.map(t=>`<li><span>${esc(t.name)}</span><span class="small nowrap">${fmt(expOf(t))}</span></li>`).join('')}</ul>
-    <div style="display:grid;gap:8px"><b style="font-size:13.5px">Optional: rename all copies at once</b>
-      <div class="g2"><label class="f">Replace this text<input class="inp" name="find" placeholder="e.g. Sep 2026"></label><label class="f">With<input class="inp" name="repl" placeholder="e.g. Oct 2026"></label></div>
-      <span class="hint">Applies to task names and periods. Leave blank to keep the names.</span></div>`,
-    submit:`Create ${plural(ts.length,'copy','copies')}`,onSubmit:async f=>{const find=f.find.value,repl=f.repl.value;const sw=s=>find?String(s||'').split(find).join(repl):s;
-      for(const t of ts){const q={...clone(t),id:uid('b'),createdDate:TODAY,order:Date.now(),name:sw(t.name),period:sw(t.period),status:'Not Started',completedDate:'',preparedDate:'',reviewedBy:'',remarks:''};await Store.save('bauTasks',q)}
-      S.bauSel={on:false,ids:new Set()};renderMain();toast(`${plural(ts.length,'copy','copies')} created. Edit their dates as needed.`);return true}});
+function bauDupManyModal(ids,title){
+  const ts=ids.map(bauTaskById).filter(Boolean);if(!ts.length){toast('Nothing to duplicate.',true);return}
+  const freqs=uniq(ts.map(t=>t.frequency));const guess=freqs.length===1?({Monthly:1,Quarterly:3,'Half-yearly':6,Yearly:12}[freqs[0]]||0):0;
+  openModal({title:title||`Duplicate ${plural(ts.length,'task')}`,body:`
+    <p class="small" style="margin:0">Copies keep the same group, PIC and reviewer. Status is reset to Not Started; actual completion and remarks are cleared.</p>
+    <ul class="list" style="max-height:170px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:0 10px">${ts.map(t=>`<li><span>${esc(t.name)}</span><span class="small nowrap">${fmt(expOf(t))}</span></li>`).join('')}</ul>
+    <label class="f">Move expected dates forward by<select class="inp" name="shift" onchange="bauDupPreview(this.form)">${[[0,'Don’t change dates'],[1,'1 month'],[2,'2 months'],[3,'3 months (next quarter)'],[6,'6 months (next half-year)'],[12,'12 months (next year)']].map(([k,l])=>`<option value="${k}" ${k===guess?'selected':''}>${l}</option>`).join('')}</select><span class="hint" id="dupm-prev"></span></label>
+    <div style="display:grid;gap:8px"><b style="font-size:13.5px">Rename the copies (optional)</b>
+      <div class="g2"><label class="f">Replace<input class="inp" name="f1" placeholder="e.g. Sep 2026" oninput="bauDupPreview(this.form)"></label><label class="f">With<input class="inp" name="r1" placeholder="e.g. Dec 2026" oninput="bauDupPreview(this.form)"></label></div>
+      <div class="g2"><label class="f">Replace<input class="inp" name="f2" placeholder="e.g. Q3" oninput="bauDupPreview(this.form)"></label><label class="f">With<input class="inp" name="r2" placeholder="e.g. Q4" oninput="bauDupPreview(this.form)"></label></div>
+      <span class="hint">Applies to task names and periods.</span></div>
+    <div><b style="font-size:13.5px">Preview</b><ul class="list" id="dupm-list" style="max-height:170px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:0 10px;margin-top:6px"></ul></div>`,
+    submit:`Create ${plural(ts.length,'copy','copies')}`,onSubmit:async f=>{const plan=dupPlan(ts,f);
+      for(const x of plan)await Store.save('bauTasks',x);
+      S.bauSel={on:false,ids:new Set()};const ym=plan[0].expectedDate?plan[0].expectedDate.slice(0,7):'';if(ym)S.bau.month=ym===curMonth()?'':ym;renderMain();
+      toast(`${plural(plan.length,'copy','copies')} created${ym?` under ${monthLabel(ym)}`:''}.`);return true}});
+  setTimeout(()=>{const f=$('#mform');if(f)bauDupPreview(f)},30);
+  window.__dupTs=ts;
 }
+function dupPlan(ts,f){
+  const k=Number(f.shift.value)||0;const pairs=[[f.f1.value,f.r1.value],[f.f2.value,f.r2.value]].filter(([a])=>a);
+  const sw=s=>pairs.reduce((acc,[a,b])=>String(acc||'').split(a).join(b),s||'');
+  return ts.map(t=>({...clone(t),id:uid('b'),createdDate:TODAY,order:Date.now(),name:sw(t.name),period:sw(t.period),expectedDate:shiftDate(t.expectedDate,k),status:'Not Started',completedDate:'',preparedDate:'',reviewedBy:'',remarks:''}));
+}
+window.bauDupPreview=function(f){
+  const ts=window.__dupTs||[];const plan=dupPlan(ts,f);const el=f.querySelector('#dupm-list');if(!el)return;
+  el.innerHTML=plan.map(x=>`<li><span>${esc(x.name)}${x.period?` <span class="small">(${esc(x.period)})</span>`:''}</span><span class="small nowrap">${fmt(x.expectedDate)}</span></li>`).join('');
+  const months=uniq(plan.map(x=>x.expectedDate&&monthLabel(x.expectedDate.slice(0,7))));const p=f.querySelector('#dupm-prev');if(p)p.textContent=months.length?`Copies will appear under ${months.join(', ')}.`:'';
+};
+
 async function addBauExamples(){
   const m0=curMonth(),m1=monthAdd(m0,1);const d=(ym,day)=>`${ym}-${pad(day)}`;
   const mk=async(g,tasks)=>{const gid=uid('g');await Store.save('bauGroups',{id:gid,createdDate:TODAY,order:Date.now(),description:'Example, edit or delete',...g});
@@ -1521,6 +1543,7 @@ document.addEventListener('click',async e=>{
     case 'bau-sel-mode':S.bauSel={on:!S.bauSel.on,ids:new Set()};renderMain();break;
     case 'bau-sel-all':{const box=[...document.querySelectorAll('[data-action="bau-sel"]')];const allOn=box.every(b=>S.bauSel.ids.has(b.dataset.t));box.forEach(b=>allOn?S.bauSel.ids.delete(b.dataset.t):S.bauSel.ids.add(b.dataset.t));renderMain();break}
     case 'bau-dup-many':bauDupManyModal([...S.bauSel.ids]);break;
+    case 'bau-dup-group':{const g=groupById(t.dataset.g);if(!g)break;const ym=S.bau.month||curMonth();const ids=bauRowsFor(ym,g.id).map(r=>r.t.id);bauDupManyModal(ids,`Duplicate ${g.name} – ${ym==='all'?'all tasks':monthLabel(ym)}`);break}
     case 'bau-approve':case 'bau-return':{const bt=bauTaskById(t.dataset.t);if(!bt)break;const ap=a==='bau-approve';if($('#modalWrap').classList.contains('open'))closeModal();
       await saveTaskPatch(bt,ap?{status:'Completed',completedDate:TODAY,reviewedBy:S.auth?.email||bt.reviewer||''}:{status:'In Progress'}).then(()=>toast(ap?'Approved':'Returned to preparer')).catch(()=>{});break}
     case 'bau-task-delete':{const bt=bauTaskById(t.dataset.t);if(!bt)break;
