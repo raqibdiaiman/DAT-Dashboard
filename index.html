@@ -75,7 +75,7 @@ body.locked .areasw{visibility:hidden}
 .tab-user{flex:none;align-self:center;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;font-weight:700;font-size:13px;margin-left:4px}
 .tab-user:hover{background:rgba(255,255,255,.2)}
 .tab-user[hidden]{display:none}
-body.locked .tabs,body.locked #moreBtn,body.locked #addBtn{visibility:hidden}
+body.locked .side,body.locked .topbar,body.locked .hamb{display:none!important}body.locked .shell{grid-template-columns:1fr}
 .auth-wrap{min-height:70vh;display:grid;place-items:center;padding:20px 0}
 .auth-card{width:min(420px,100%);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:26px 24px;display:grid;gap:14px}
 .auth-card form{display:grid;gap:12px}
@@ -348,26 +348,186 @@ select.ssel{appearance:none;-webkit-appearance:none;border:1px solid color-mix(i
 .fs legend+*{clear:both}
 .form-actions{display:flex;gap:8px;justify-content:flex-end}
 
-.toasts{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:80;display:flex;flex-direction:column;gap:8px;max-width:calc(100% - 32px)}
+.bell{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:35;width:56px;height:56px;border-radius:50%;border:0;background:var(--nav);color:#fff;box-shadow:0 6px 18px rgba(20,34,61,.3);display:grid;place-items:center}
+.bell[hidden]{display:none}
+.bell svg{width:24px;height:24px}
+.bell:hover{filter:brightness(1.15)}
+.bell .bdg{position:absolute;top:-2px;right:-2px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--s-ip);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;border:2px solid var(--bg)}
+.bell.hot .bdg{background:var(--s-late)}
+.bell .bdg[hidden]{display:none}
+.remind-wrap{position:fixed;inset:0;z-index:55;display:none}
+.remind-wrap.open{display:block}
+.remind-scrim{position:absolute;inset:0;background:rgba(12,20,36,.3)}
+.remind-panel{position:absolute;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--bg);box-shadow:-8px 0 30px rgba(0,0,0,.18);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.rp-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:16px 18px 10px;background:var(--surface);border-bottom:1px solid var(--line)}
+.rp-h h2{font-size:18px;font-weight:600}
+.rp-tools{display:flex;gap:8px;padding:10px 18px;background:var(--surface);border-bottom:1px solid var(--line)}
+.rp-tools .inp{flex:1}
+.rp-note{margin:0;padding:8px 18px;background:color-mix(in srgb,var(--s-hold) 10%,var(--surface));border-bottom:1px solid var(--line)}
+.rp-b{flex:1;overflow-y:auto;padding:12px 18px 20px;display:grid;gap:16px;align-content:start}
+.rp-sec h3{font-size:14px;font-weight:600;margin:0 0 6px;display:flex;align-items:center;gap:8px}
+.rp-sec h3 i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.rp-sum{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.rp-sum th,.rp-sum td{padding:6px 10px}
+.rlist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.rlist li{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.ritem{background:none;border:0;padding:0;text-align:left;display:flex;flex-direction:column;gap:1px;min-width:0}
+.ritem .rt{font-weight:600}
+.ritem:hover .rt{color:var(--accent);text-decoration:underline}
+.rd{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none}
+.rp-f{padding:10px 18px;border-top:1px solid var(--line);background:var(--surface)}
+.team-head,.team-row{display:grid;grid-template-columns:1fr 1.3fr .8fr 30px;gap:8px;align-items:center}
+.team-head{font-size:12px;color:var(--muted);font-weight:600}
+#team-rows{display:grid;gap:6px}
+@media (max-width:620px){.team-head{display:none}.team-row{grid-template-columns:1fr 30px}.team-row input[data-team="email"],.team-row input[data-team="role"]{grid-column:1}}
+.toasts{position:fixed;right:16px;bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:80;display:flex;flex-direction:column;gap:8px;max-width:calc(100% - 32px)}
 .toast{background:var(--nav);color:#fff;padding:10px 14px;border-radius:8px;box-shadow:var(--shadow);font-size:14px}
 .toast.err{background:var(--s-late)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ===== Layout v3: vertical sidebar + top view tabs ===== */
+:root{--side-w:276px}
+html{scroll-padding-top:84px}
+body{font-size:15px}
+.shell{display:grid;grid-template-columns:var(--side-w) minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;height:100dvh;background:var(--nav);color:#fff;display:flex;flex-direction:column;overflow:hidden;z-index:40}
+.side-top{padding:20px 16px 14px;display:grid;gap:16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.side .brand{display:flex;gap:11px;align-items:center;margin:0}
+.side .brand b{display:block;font-size:15.5px;font-weight:600;line-height:1.2}
+.side .brand span{display:block;font-size:12px;opacity:.6}
+.side .mark{background:rgba(255,255,255,.14);width:38px;height:38px}
+.side .areasw{display:grid;grid-template-columns:1fr 1fr;margin:0;width:100%;padding:4px;border-radius:9px}
+.side .areasw button{padding:8px;font-size:13.5px}
+.side-nav{flex:1;overflow-y:auto;padding:14px 10px;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}
+.snav{display:flex;gap:11px;align-items:center;padding:11px 12px;border:0;background:none;color:rgba(255,255,255,.82);border-radius:9px;font-weight:500;font-size:14.5px;text-align:left;width:100%}
+.snav svg{width:19px;height:19px;flex:none}
+.snav:hover{background:rgba(255,255,255,.07);color:#fff}
+.snav.active{background:rgba(255,255,255,.15);color:#fff;font-weight:600}
+.side-sec{display:flex;justify-content:space-between;align-items:center;padding:18px 12px 8px;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.55);font-weight:600;background:none;border:0;width:100%;text-align:left}
+.side-sec em{font-style:normal;background:rgba(255,255,255,.12);border-radius:8px;padding:1px 7px;margin-left:6px;letter-spacing:0}
+.side-sec.arch{cursor:pointer;padding-top:14px}
+.side-add{border:1px solid rgba(255,255,255,.28);background:none;color:#fff;border-radius:7px;width:28px;height:28px;display:grid;place-items:center}
+.side-add:hover{background:rgba(255,255,255,.12)}
+.side-add svg{width:15px;height:15px}
+.side-q{margin:2px 2px 8px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:#fff;width:auto}
+.side-q::placeholder{color:rgba(255,255,255,.5)}
+.side-list{display:flex;flex-direction:column;gap:2px}
+.sitem{display:grid;grid-template-columns:9px 1fr;column-gap:11px;row-gap:2px;align-items:center;padding:9px 12px;border:0;background:none;color:rgba(255,255,255,.86);border-radius:9px;text-align:left;width:100%}
+.sitem i{width:9px;height:9px;border-radius:50%}
+.sitem .sn{font-size:14px;font-weight:500;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sitem .sm{grid-column:2;font-size:12px;color:rgba(255,255,255,.55)}
+.sitem .sm.late{color:#FFA69C}
+.sitem:hover{background:rgba(255,255,255,.07)}
+.sitem.active{background:rgba(255,255,255,.16);color:#fff;box-shadow:inset 3px 0 0 #76A9F5}
+.side-foot{padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid rgba(255,255,255,.08);display:flex;gap:8px;flex-wrap:wrap}
+.sfoot{border:1px solid rgba(255,255,255,.22);background:none;color:rgba(255,255,255,.88);border-radius:8px;padding:7px 12px;font-size:13px}
+.sfoot:hover{background:rgba(255,255,255,.1)}
+.side-scrim{display:none}
+.content{min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:18px;padding:0 36px;min-height:68px;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.hamb{display:none}
+.tb-title{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
+.tb-area{font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.tb-cur{font-weight:600;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;overflow:visible;flex:0 0 auto;height:auto;order:0;border-top:1px solid var(--line);box-shadow:var(--shadow)}
+.ttab{display:flex;align-items:center;gap:8px;border:0;background:none;padding:9px 18px;border-radius:8px;font-weight:600;font-size:14px;color:var(--muted);white-space:nowrap}
+.ttab svg{width:17px;height:17px}
+.ttab:hover{color:var(--ink);background:var(--surface-2)}
+.ttab.active{background:var(--nav);color:#fff}
+.topbar .tab-user{background:var(--nav);border:0;color:#fff;margin:0}
+.main{padding:32px 36px 110px;max-width:1520px;width:100%;margin:0 auto}
+/* roomier components */
+.page-h{margin-bottom:24px}
+.page-h h1{font-size:clamp(24px,2.4vw,32px)}
+.panel{padding:22px 24px;margin-bottom:22px}
+.panel.flush>.panel-h{padding:20px 24px 0}
+.panel-h{margin-bottom:16px}
+.panel-h h2{font-size:17px}
+.grid2{gap:22px;margin-bottom:22px!important}
+.kpis{gap:16px;margin-bottom:22px}
+.kpi{padding:18px 20px;gap:4px}
+.kpi .n{font-size:32px}
+.filterbar{padding:16px 20px;gap:14px;margin-bottom:22px}
+.tbar{padding:0 24px 16px;gap:10px}
+.t{font-size:14.5px}
+.t th{padding:12px 12px}
+.t td{padding:13px 12px}
+.t th:first-child,.t td:first-child{padding-left:24px}
+.t th:last-child,.t td:last-child{padding-right:24px}
+.list li{padding:11px 0}
+.phead{padding:24px 26px;margin-bottom:22px}
+/* visualisation */
+.vgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px}
+.vgrid .panel{margin:0}
+.vgrid .span2{grid-column:1/-1}
+.vbars{display:grid;gap:8px}
+.vbar{display:grid;grid-template-columns:minmax(120px,30%) minmax(0,1fr) 84px;gap:14px;align-items:center;background:none;border:0;padding:6px 8px;border-radius:8px;text-align:left;width:100%;color:inherit}
+button.vbar:hover{background:var(--surface-2)}
+.vl{font-size:14px;font-weight:500;display:flex;flex-direction:column;min-width:0}
+.vl small{font-size:12px;color:var(--faint);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vt{position:relative;height:18px;background:var(--surface-2);border-radius:6px;display:flex;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+.vt i{display:block;height:100%}
+.vt em{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);opacity:.75}
+.vv{font-weight:600;font-size:13.5px;text-align:right;white-space:nowrap}
+.vlegend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:12.5px;color:var(--muted)}
+.vlegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+/* BAU gantt */
+.bg-group{padding:10px 24px;background:var(--surface-2);font-weight:600;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:baseline}
+.bg-exp{position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;background:var(--c);transform:rotate(45deg);border-radius:2px;z-index:2;box-shadow:0 0 0 2px var(--surface)}
+.bg-act{position:absolute;top:50%;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-radius:50%;background:var(--c);z-index:2;box-shadow:0 0 0 2px var(--surface)}
+.bg-link{position:absolute;top:50%;height:4px;margin-top:-2px;border-radius:2px;opacity:.55}
+.bg-sub{position:absolute;top:calc(50% + 13px);width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:var(--s-ns);opacity:.85}
+.bg-sub.done{background:var(--s-done)}.bg-sub.late{background:var(--s-late)}
+.g-head .g-label,.g-name{padding-left:24px}
+@media (max-width:1100px){.vgrid{grid-template-columns:1fr}.vbar{grid-template-columns:minmax(100px,34%) minmax(0,1fr) 70px}}
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .side{position:fixed;left:0;top:0;bottom:0;width:min(300px,86vw);height:100%;transform:translateX(-102%);transition:transform .22s ease;box-shadow:8px 0 30px rgba(0,0,0,.25);padding-top:env(safe-area-inset-top,0px)}
+  body.side-open .side{transform:none}
+  body.side-open .side-scrim{display:block;position:fixed;inset:0;background:rgba(10,18,32,.45);z-index:39}
+  .topbar{padding:8px 14px;gap:10px;min-height:60px;top:0;padding-top:calc(8px + env(safe-area-inset-top,0px));margin-top:calc(-1 * env(safe-area-inset-top,0px))}
+  .hamb{display:grid;width:40px;height:40px;place-items:center;border:1px solid var(--line);background:var(--surface);border-radius:9px;color:var(--ink)}
+  .hamb svg{width:20px;height:20px}
+  .tb-cur{font-size:14px}
+  .ttab{padding:8px 11px;font-size:13px}
+  .main{padding:20px 16px 110px}
+  .panel{padding:18px 16px}
+  .panel.flush>.panel-h{padding:16px 16px 0}
+  .tbar{padding:0 16px 14px}
+  .t th:first-child,.t td:first-child{padding-left:16px}
+  .t th:last-child,.t td:last-child{padding-right:16px}
+  .kpi .n{font-size:28px}
+}
+@media (max-width:620px){
+  .topbar{flex-wrap:wrap}
+  .tb-title{flex:1 1 calc(100% - 110px)}
+  .topbar .tabs{order:5;flex:1 1 100%;justify-content:stretch;margin-bottom:4px}
+  .ttab{flex:1;justify-content:center;padding:8px 6px}
+  .ttab svg{display:none}
+  .vbar{grid-template-columns:1fr 64px;row-gap:4px}
+  .vbar .vl{grid-column:1/-1}
+}
 </style>
 </head>
 <body>
-<header class="top">
-  <nav class="top-in" aria-label="Main">
-    <div class="brand"><div class="mark" aria-hidden="true">DAT</div><b>Project Monitoring</b></div>
-    <div class="areasw" id="areaSw" role="group" aria-label="Section"></div>
-    <div class="tabs" id="tabs"></div>
-    <button class="tab-more" id="moreBtn" aria-haspopup="true" aria-expanded="false" hidden>More <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+<div class="shell">
+<aside class="side" id="side" aria-label="Navigation"></aside>
+<div class="side-scrim" data-action="side-toggle"></div>
+<div class="content">
+  <header class="topbar" id="topbar">
+    <button class="iconbtn hamb" data-action="side-toggle" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="tb-title" id="tbTitle"></div>
+    <nav class="tabs" id="tabs" aria-label="Views"></nav>
     <button class="tab-user" id="userBtn" data-action="user-menu" hidden title="Account">?</button>
-    <button class="tab-add" id="addBtn" data-nav="add"><span class="pill-add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Add Project</span></span></button>
-  </nav>
-</header>
-<div class="morepanel" id="morePanel" role="dialog" aria-label="More projects"></div>
+  </header>
+  <div hidden><div id="areaSw"></div><button id="moreBtn" hidden></button><button id="addBtn"><span class="lbl"></span></button></div>
+  <div class="morepanel" id="morePanel"></div>
 <main class="main" id="main" tabindex="-1"></main>
+</div>
+</div>
 <div class="modal-wrap" id="modalWrap"><div class="modal-scrim" data-action="close-modal"></div><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
+<button class="bell" id="bellBtn" data-action="remind-open" hidden aria-label="Reminders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="bdg" hidden>0</span></button>
+<div class="remind-wrap" id="remindWrap"><div class="remind-scrim" data-action="remind-close"></div><aside class="remind-panel" id="remindPanel" role="dialog" aria-label="Reminders"></aside></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script>
@@ -629,6 +789,7 @@ async function initData(){
       for(const [k,coll] of Object.entries(TABLES)){
         UNSUBS.push(db.collection(coll).onSnapshot(s=>{S[k]=s.docs.map(d=>({...clone(d.data()),id:d.id}));S.loaded[k]=true;refresh();if(ready())autoBackupOnce();if(S.loaded.bauTasks&&S.loaded.bauCycles)migrateLegacyBau()},onErr));
       }
+      if(S.mode==='firebase'){const dr=db.collection('meta').doc('team');if(dr.onSnapshot)UNSUBS.push(dr.onSnapshot(d=>{const v=d.exists?d.data():null;S.team=v&&Array.isArray(v.people)?v.people:[];refresh()},()=>{}))}
     };
     if(S.mode==='firebase'){startAuth(db,subscribe);return}
     subscribe();
@@ -637,6 +798,7 @@ async function initData(){
     let d=null;try{d=JSON.parse(lsGet(LS_DATA,'null'))}catch(e){}
     if(!d){d=await fetchSample();if(d)lsSet(LS_DATA,JSON.stringify(d))}
     if(d){S.projects=d.projects||[];S.subs=d.subs||[];S.issues=d.issues||[];S.bauGroups=d.bauGroups||[];S.bauTasks=d.bauTasks||[];S.bauCycles=d.bauCycles||[]}
+    teamFromStore();
     S.loaded={projects:true,subs:true,issues:true,bauGroups:true,bauTasks:true,bauCycles:true};refresh();migrateLegacyBau();
   }
 }
@@ -662,7 +824,7 @@ function overdueDays(due,prog){return due&&TODAY>due&&prog<100?diffDays(due,TODA
 const projOverdue=p=>overdueDays(p.dueDate,progressOf(p));
 const subOverdue=s=>overdueDays(s.dueDate,Number(s.progress)||0);
 function lastUpdatedOf(p){return [p.lastUpdated,...subsOf(p.id).map(s=>s.lastUpdated),...issuesOf(p.id).map(i=>i.lastUpdated)].filter(Boolean).sort().slice(-1)[0]}
-const allPics=()=>uniq([...S.projects.map(p=>p.pic),...S.subs.map(s=>s.pic),...S.issues.map(i=>i.pic)]);
+const allPics=()=>uniq([...(S.team||[]).map(p=>p.name),...S.projects.map(p=>p.pic),...S.subs.map(s=>s.pic),...S.issues.map(i=>i.pic)]);
 
 /* =========================================================
    Shared renderers
@@ -695,42 +857,44 @@ const countBy=(items,fn)=>items.reduce((a,x)=>{const k=fn(x);a[k]=(a[k]||0)+1;re
 /* =========================================================
    Navigation
    ========================================================= */
-const areaOf=v=>(v==='bau'||v==='bauchk'||String(v).startsWith('g:'))?'bau':'projects';
+const areaOf=v=>(['bau','bauchk','bviz','bgantt'].includes(v)||String(v).startsWith('g:'))?'bau':'projects';
 const LAST={projects:'dashboard',bau:'bau'};
+S.sideQ='';S.sideArch=false;
+const NAVICON={
+  sum:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+  viz:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  gantt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 5h9M7 11h11M5 17h8"/><path d="M3 21h18" opacity=".5"/></svg>',
+  chk:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m4 12 5 5L20 6"/></svg>'
+};
 function renderTabs(){
-  const tabs=$('#tabs');const v=S.view;
-  const area=areaOf(v);LAST[area]=v;
-  $('#areaSw').innerHTML=`<button data-action="area" data-k="projects" aria-pressed="${area==='projects'}">Projects</button><button data-action="area" data-k="bau" aria-pressed="${area==='bau'}">BAU</button>`;
-  const addB=$('#addBtn');addB.querySelector('.lbl').textContent=area==='bau'?'Add BAU Group':'Add Project';if(area==='bau'){addB.removeAttribute('data-nav');addB.dataset.action='bau-group-modal'}else{addB.dataset.nav='add';delete addB.dataset.action}
-  if(area==='bau'){
-    tabs.innerHTML=`<button class="tab ${v==='bau'?'active':''}" data-nav="bau" ${v==='bau'?'aria-current="page"':''}><span class="long">BAU </span>Dashboard</button><button class="tab ${v==='bauchk'?'active':''}" data-nav="bauchk" ${v==='bauchk'?'aria-current="page"':''}>Checklist</button>`+
-      bauGroupsSorted().map(g=>`<button class="tab ptab ${v==='g:'+g.id?'active':''}" data-nav="g:${g.id}" data-pid="${g.id}" title="${esc(g.name)}" ${v==='g:'+g.id?'aria-current="page"':''}>${esc(g.name)}</button>`).join('');
-  }else
-  tabs.innerHTML=`<button class="tab ${v==='dashboard'?'active':''}" data-nav="dashboard" ${v==='dashboard'?'aria-current="page"':''}>Dashboard</button><button class="tab ${v==='gantt'?'active':''}" data-nav="gantt" ${v==='gantt'?'aria-current="page"':''}><span class="long">Overall </span>Gantt</button>`+
-    activeProjects().map(p=>`<button class="tab ptab ${v==='p:'+p.id?'active':''}" data-nav="p:${p.id}" data-pid="${p.id}" title="${esc(p.name)}" ${v==='p:'+p.id?'aria-current="page"':''}>${esc(p.name)}</button>`).join('');
-  $('#addBtn').classList.toggle('active',v==='add');
+  const v=S.view;const area=areaOf(v);LAST[area]=v;
+  const side=$('#side');const q=S.sideQ.trim().toLowerCase();
+  const items=area==='projects'?activeProjects().map(p=>({id:p.id,nav:'p:'+p.id,name:p.name,dot:`var(--s-${SCLS[p.status]||'ns'})`,meta:`${Math.round(progressOf(p))}%${projOverdue(p)?' · overdue':''}`,late:!!projOverdue(p),hay:[p.name,p.pic].join(' ')}))
+    :bauGroupsSorted().map(g=>{const st=groupStatus(monthRows(curMonth(),g.id));const s2=bauStats(monthRows(curMonth(),g.id));return {id:g.id,nav:'g:'+g.id,name:g.name,dot:`var(--s-${GCLS[st]||'ns'})`,meta:`${s2.done}/${s2.total} this month${s2.overdue?` · ${s2.overdue} overdue`:''}`,late:st==='Overdue',hay:[g.name,g.owner,g.entity].join(' ')}});
+  const shown=q?items.filter(i=>i.hay.toLowerCase().includes(q)):items;
+  const arch=area==='projects'?archivedProjects().filter(p=>!q||p.name.toLowerCase().includes(q)):[];
+  const overview=area==='projects'?['dashboard','pviz','gantt']:['bau','bviz','bgantt'];
+  side.innerHTML=`
+    <div class="side-top"><div class="brand"><div class="mark" aria-hidden="true">DAT</div><div><b>DAT Monitoring</b><span>Data Automation Team</span></div></div>
+      <div class="areasw" role="group" aria-label="Section"><button data-action="area" data-k="projects" aria-pressed="${area==='projects'}">Projects</button><button data-action="area" data-k="bau" aria-pressed="${area==='bau'}">BAU</button></div></div>
+    <nav class="side-nav">
+      <button class="snav ${overview.includes(v)?'active':''}" data-nav="${overview[0]}">${NAVICON.sum}<span>Overview</span></button>
+      ${area==='bau'?`<button class="snav ${v==='bauchk'?'active':''}" data-nav="bauchk">${NAVICON.chk}<span>Checklist</span></button>`:''}
+      <div class="side-sec"><span>${area==='projects'?'Projects':'BAU groups'} <em>${items.length}</em></span><button class="side-add" ${area==='projects'?'data-nav="add"':'data-action="bau-group-modal"'} title="${area==='projects'?'Add project':'Add BAU group'}" aria-label="${area==='projects'?'Add project':'Add BAU group'}">${ICON.plus}</button></div>
+      ${items.length>6||q?`<input class="inp side-q" id="side-q" type="search" placeholder="Search ${area==='projects'?'projects':'groups'}" value="${esc(S.sideQ)}" aria-label="Search">`:''}
+      <div class="side-list">${shown.map(i=>`<button class="sitem ${v===i.nav?'active':''}" data-nav="${i.nav}" title="${esc(i.name)}"><i style="background:${i.dot}"></i><span class="sn">${esc(i.name)}</span><span class="sm ${i.late?'late':''}">${esc(i.meta)}</span></button>`).join('')||`<p class="small" style="padding:6px 12px;margin:0">${q?'No matches.':area==='projects'?'No projects yet.':'No BAU groups yet.'}</p>`}
+      ${arch.length?`<button class="side-sec arch" data-action="side-arch"><span>Archived <em>${arch.length}</em></span><span>${S.sideArch?'▾':'▸'}</span></button>${S.sideArch?arch.map(p=>`<button class="sitem ${v==='p:'+p.id?'active':''}" data-nav="p:${p.id}"><i style="background:var(--faint)"></i><span class="sn">${esc(p.name)}</span><span class="sm">Archived</span></button>`).join(''):''}`:''}</div>
+    </nav>
+    <div class="side-foot"><button class="sfoot" data-action="team-modal">Team directory</button>${S.mode!=='db'?`<button class="sfoot" data-action="backups">Backups</button>`:''}</div>`;
+  const labels=area==='projects'?[['dashboard','Summary',NAVICON.sum],['pviz','Visualisation',NAVICON.viz],['gantt','Gantt chart',NAVICON.gantt]]:[['bau','Summary',NAVICON.sum],['bviz','Visualisation',NAVICON.viz],['bgantt','Gantt chart',NAVICON.gantt]];
+  $('#tabs').innerHTML=labels.map(([k,l,ic])=>`<button class="ttab ${v===k?'active':''}" data-nav="${k}" ${v===k?'aria-current="page"':''}>${ic}<span>${l}</span></button>`).join('');
+  const cur=area==='projects'?(v.startsWith('p:')?projById(v.slice(2))?.name:v==='add'?'New project':''):(v.startsWith('g:')?groupById(v.slice(2))?.name:v==='bauchk'?'Checklist':'');
+  $('#tbTitle').innerHTML=`<span class="tb-area">${area==='projects'?'Projects':'BAU'}</span>${cur?`<span class="tb-cur">${esc(cur)}</span>`:''}`;
   const ub=$('#userBtn');ub.hidden=!(S.mode==='firebase'&&S.auth.state==='in');if(!ub.hidden){ub.textContent=(S.auth.email||'?')[0].toUpperCase();ub.title=`Signed in as ${S.auth.email}`;ub.setAttribute('aria-label',`Account: ${S.auth.email}`)}
-  fitTabs();
+  const sq=$('#side-q');if(sq&&S.__sideFocus){sq.focus();sq.setSelectionRange(sq.value.length,sq.value.length);S.__sideFocus=false}
 }
 let hiddenTabs=[];
-function fitTabs(){
-  const bar=$('#tabs'),more=$('#moreBtn');const pt=[...bar.querySelectorAll('.ptab')];
-  pt.forEach(t=>t.hidden=false);hiddenTabs=[];
-  const hasArchived=areaOf(S.view)==='projects'&&archivedProjects().length>0;
-  more.hidden=!hasArchived;
-  if(bar.scrollWidth>bar.clientWidth+1){
-    more.hidden=false;
-    for(let i=pt.length-1;i>=0&&bar.scrollWidth>bar.clientWidth+1;i--){if(pt[i].classList.contains('active'))continue;pt[i].hidden=true;hiddenTabs.unshift(pt[i].dataset.pid)}
-    const act=pt.find(t=>t.classList.contains('active'));
-    if(act&&bar.scrollWidth>bar.clientWidth+1){act.hidden=true;hiddenTabs.unshift(act.dataset.pid)}
-  }
-  if(!hiddenTabs.length&&!hasArchived)more.hidden=true;
-  bar.scrollLeft=0;
-  const activeHidden=(S.view.startsWith('p:')||S.view.startsWith('g:'))&&(projById(S.view.slice(2))?.archived||hiddenTabs.includes(S.view.slice(2)));
-  more.classList.toggle('active',!!activeHidden);
-  more.firstChild.textContent=hiddenTabs.length?`More (${hiddenTabs.length}) `:'More ';
-  if($('#morePanel').classList.contains('open'))renderMorePanel(false);
-}
+function fitTabs(){}
 function openMore(){
   const b=$('#moreBtn').getBoundingClientRect();const pn=$('#morePanel');
   pn.style.top=(b.bottom+4)+'px';pn.style.right=Math.max(10,window.innerWidth-b.right)+'px';
@@ -836,8 +1000,8 @@ function subChip(t){const n=subsOfT(t).length;if(!n)return '';const d=subDone(t)
 function subPanel(t){
   const subs=subsOfT(t);const g=groupById(t.groupId);const tpl=tplOf(g);const missing=tpl.filter(n=>!subs.some(x=>x.name.trim().toLowerCase()===n.trim().toLowerCase()));
   return `<div class="subpanel">
-    ${subs.length?`<div class="small" style="font-weight:600;color:var(--ink);margin-bottom:4px">Sub-tasks · ${subDone(t)} of ${subs.length} done</div><ul class="sublist">${subs.map(x=>`<li class="${x.done?'done':''}"><label><input type="checkbox" class="check" style="accent-color:var(--s-done)" data-action="bau-sub-toggle" data-t="${t.id}" data-s="${x.id}" ${x.done?'checked':''}><span>${esc(x.name)}</span></label><span class="small nowrap">${x.expectedDate?'Expected '+fmt(x.expectedDate):''}</span><span class="small nowrap" style="min-width:120px;text-align:right">${x.done?(x.doneDate?'Actual '+fmt(x.doneDate):'Done'):stOverdue(x)?`<span class="pill">${plural(diffDays(x.expectedDate,TODAY),'day')} overdue</span>`:''}</span><button class="iconbtn" data-action="bau-sub-del" data-t="${t.id}" data-s="${x.id}" aria-label="Remove sub-task">${ICON.x}</button></li>`).join('')}</ul>`:'<p class="small" style="margin:0 0 8px">No sub-tasks yet.</p>'}
-    <div class="addrow" style="max-width:560px"><input class="inp" id="sub-add-${t.id}" placeholder="Add a sub-task" data-enter="bau-sub-add" data-id="${t.id}" data-k="x"><button class="btn sm" data-action="bau-sub-add" data-id="${t.id}" data-k="x">Add</button>${missing.length?`<button class="btn sm" data-action="bau-sub-tpl" data-t="${t.id}" title="${esc(missing.join(', '))}">Add standard sub-tasks (${missing.length})</button>`:''}</div>
+    ${subs.length?`<div class="small" style="font-weight:600;color:var(--ink);margin-bottom:4px">Sub-tasks · ${subDone(t)} of ${subs.length} done</div><ul class="sublist">${subs.map(x=>`<li class="${x.done?'done':''}"><label><input type="checkbox" class="check" style="accent-color:var(--s-done)" data-action="bau-sub-toggle" data-t="${t.id}" data-s="${x.id}" ${x.done?'checked':''}><span>${esc(x.name)}</span></label><span class="small nowrap">${x.expectedDate?'Expected '+fmt(x.expectedDate):`<button class="pill" style="border:0;cursor:pointer" data-action="bau-task-modal" data-t="${t.id}" title="Open the task to set it">No expected date</button>`}</span><span class="small nowrap" style="min-width:120px;text-align:right">${x.done?(x.doneDate?'Actual '+fmt(x.doneDate):'Done'):stOverdue(x)?`<span class="pill">${plural(diffDays(x.expectedDate,TODAY),'day')} overdue</span>`:''}</span><button class="iconbtn" data-action="bau-sub-del" data-t="${t.id}" data-s="${x.id}" aria-label="Remove sub-task">${ICON.x}</button></li>`).join('')}</ul>`:'<p class="small" style="margin:0 0 8px">No sub-tasks yet.</p>'}
+    <div class="addrow" style="max-width:760px;flex-wrap:wrap"><input class="inp" id="sub-add-${t.id}" placeholder="New sub-task name" data-enter="bau-sub-add" data-id="${t.id}" data-k="x" style="flex:1 1 220px"><input class="inp" type="date" id="sub-date-${t.id}" value="${esc(expOf(t))}" aria-label="Expected date" title="Expected date (required)" style="width:160px"><button class="btn sm" data-action="bau-sub-add" data-id="${t.id}" data-k="x">Add</button>${missing.length?`<button class="btn sm" data-action="bau-sub-tpl" data-t="${t.id}" title="${esc(missing.join(', '))}">Add standard sub-tasks (${missing.length})</button>`:''}</div>
   </div>`;
 }
 async function saveSubs(t,subs,msg){
@@ -956,9 +1120,10 @@ function renderBauDashboard(){
     ${bkpi('On-time rate',d3?Math.round(o3/d3*100)+'%':'—','Last 3 months','var(--accent)')}
   </section>
   <div class="grid2" style="margin-bottom:16px">
-    <section class="panel"><div class="panel-h"><h2>BAU group status</h2><div class="seg-toggle" role="group" aria-label="Chart type"><button data-action="bau-dchart" data-k="donut" aria-pressed="${D.chart==='donut'}">Donut</button><button data-action="bau-dchart" data-k="bar" aria-pressed="${D.chart==='bar'}">Bar</button></div></div>
-      ${chartBlock(counts,gRows.length,D.chart,D.focus,'bau-focus',GSTATUS,GCLS)}
-      <p class="small" style="margin:12px 0 0">Overdue: a task is past its expected completion date. At risk: a task is due within 3 days or one of its sub-tasks is overdue. Select a status to filter the table below.</p></section>
+    <section class="panel"><div class="panel-h"><h2>Awaiting review / approval</h2><button class="btn sm" data-nav="bviz">View charts</button></div>
+      ${(()=>{const pr=S.bauTasks.filter(t=>t.status==='Pending Review').sort((a,b)=>expOf(a).localeCompare(expOf(b)));
+        return pr.length?`<ul class="list">${pr.slice(0,7).map(t=>`<li><div><button class="l1" data-action="bau-task-modal" data-t="${t.id}">${esc(t.name)}</button><div class="small">Reviewer <b>${esc(t.reviewer||'—')}</b> · prepared by ${esc(t.pic||'—')}${t.preparedDate?' on '+fmt(t.preparedDate):''}</div></div><span style="display:flex;gap:6px;align-items:center"><span class="small nowrap">${fmt(expOf(t))}</span><button class="btn sm" data-action="bau-approve" data-t="${t.id}">Approve</button></span></li>`).join('')}</ul>${pr.length>7?`<p class="small" style="margin:8px 0 0">+${pr.length-7} more</p>`:''}`:emptyState('Nothing awaiting approval','')})()}
+    </section>
     <section class="panel"><div class="panel-h"><h2>Reminders</h2><span class="meta">Overdue and due in the next 7 days</span></div>
       ${remind.length?`<ul class="list">${remind.slice(0,8).map(({t,sub,date})=>{const dd=diffDays(TODAY,date);return `<li><div><button class="l1" data-action="bau-task-modal" data-t="${t.id}">${sub?`↳ ${esc(sub.name)}`:esc(t.name)}</button><div class="small">${sub?`Sub-task of ${esc(t.name)} · `:''}${esc(groupById(t.groupId)?.name||'Ungrouped')}${t.period?' · '+esc(t.period):''} · ${esc(t.pic||'—')}${t.status==='Pending Review'?' · awaiting review':''}${subsOfT(t).length?` · ${subDone(t)}/${subsOfT(t).length} sub-tasks`:''}</div></div><div style="text-align:right"><div class="nowrap small">${fmt(date)}</div>${dd<0?`<span class="pill">${plural(-dd,'day')} overdue</span>`:`<span class="pill ${dd>3?'q':''}">${dd===0?'Due today':'in '+plural(dd,'day')}</span>`}</div></li>`}).join('')}</ul>${remind.length>8?`<p class="small" style="margin:8px 0 0">+${remind.length-8} more in the <button class="linkbtn" data-nav="bauchk">checklist</button></p>`:''}`:emptyState('Nothing overdue or due this week','')}
     </section>
@@ -977,13 +1142,7 @@ function renderBauDashboard(){
     </tbody></table></div>`:emptyState('No groups match these filters','',`<button class="btn" data-action="bau-clear" data-path="bauD">Clear filters</button>`)}
     ${ungrouped?`<p class="small" style="padding:10px 18px;margin:0;border-top:1px solid var(--line)">${plural(ungrouped,'task')} not in a group. Find them in the <button class="linkbtn" data-nav="bauchk">checklist</button> and assign a group via Edit.</p>`:''}
   </section>
-  <div class="grid2" style="margin-bottom:16px">
-    <section class="panel"><div class="panel-h"><h2>On-time trend</h2><span class="meta">Tasks completed by their expected date</span></div>
-      <div class="hbars">${trend.map(m=>`<div class="hbar" style="--c:var(--s-done);cursor:default"><span>${monShort(m.ym)}</span><span class="track"><i style="width:${m.pct??0}%"></i></span><span class="v">${m.pct===null?'—':m.pct+'%'}<small>${m.due?`${m.onTime}/${m.due}`:''}</small></span></div>`).join('')}</div>
-      <p class="small" style="margin:10px 0 0">The current month counts only tasks already due.</p></section>
-    <section class="panel"><div class="panel-h"><h2>Workload by PIC</h2><span class="meta">${monthLabel(ym)}</span></div>
-      ${pics.length?`<div class="tw"><table class="t"><thead><tr><th>PIC</th><th>Tasks</th><th>Completed</th><th>Est. hours</th></tr></thead><tbody>${pics.map(([k,o])=>`<tr><td>${esc(k)}</td><td>${o.n}</td><td>${o.done} <span class="small">(${pct(o.done,o.n)}%)</span></td><td>${Math.round(o.hrs*10)/10}</td></tr>`).join('')}</tbody></table></div>`:'<p class="small">No tasks due this month.</p>'}</section>
-  </div>`}`;
+`}`;
 }
 
 /* ---------- BAU CHECKLIST (all groups) ---------- */
@@ -1050,6 +1209,7 @@ function renderBauGroup(g){
 /* ---------- saving ---------- */
 function normTask(r){
   const me=S.auth?.email||'';
+  if(r.status==='Completed'||r.status==='Pending Review'){r.returnedDate='';r.returnedBy=''}
   if(r.status==='Completed'){r.completedDate=r.completedDate||TODAY;r.preparedDate=r.preparedDate||r.completedDate;if(r.reviewer&&!r.reviewedBy)r.reviewedBy=me||r.reviewer}
   else if(r.status==='Pending Review'){r.preparedDate=r.preparedDate||TODAY;r.completedDate='';r.reviewedBy=''}
   else{r.completedDate='';r.reviewedBy='';if(r.status==='Not Started')r.preparedDate=''}
@@ -1069,6 +1229,7 @@ function bauGroupModal(id){
       const q=g?clone(g):{id:uid('g'),createdDate:TODAY,order:Date.now()};Object.assign(q,{name:gv('name'),description:gv('description'),owner:gv('owner'),entity:gv('entity'),template:String(fd.get('template')||'').split('\n').map(x=>x.trim()).filter(Boolean)});
       await Store.save('bauGroups',q);toast(g?'Group saved':`${q.name} created`);if(!g)go('g:'+q.id);return true}});
 }
+const shiftDays=(d,n)=>{const x=parse(d);x.setDate(x.getDate()+n);return iso(x)};
 /* Move a date forward by whole months. A month-end date stays month-end (30 Sep → 31 Dec). */
 function shiftDate(d,k){if(!d||!k)return d;const [y,m,dd]=d.split('-').map(Number);const lastSrc=new Date(y,m,0).getDate();const t=new Date(y,m-1+Number(k),1);const lastT=new Date(t.getFullYear(),t.getMonth()+1,0).getDate();return iso(new Date(t.getFullYear(),t.getMonth(),dd===lastSrc?lastT:Math.min(dd,lastT)))}
 window.bauShift=function(f,k){const e=f.expectedDate;if(!e.value){toast('Set an expected date first.',true);return}e.value=shiftDate(e.value,k);(window.__msubs||[]).forEach(x=>{if(x.expectedDate)x.expectedDate=shiftDate(x.expectedDate,k)});renderModalSubs();const n=f.querySelector('#dup-when');if(n)n.textContent=`Will appear under ${monthLabel(e.value.slice(0,7))}.`};
@@ -1078,8 +1239,9 @@ function renderModalSubs(){
   const g=groupById(f?.groupId?.value);const missing=tplOf(g).filter(n=>!subs.some(x=>x.name.trim().toLowerCase()===n.trim().toLowerCase()));
   const d=subs.filter(x=>x.done).length;
   el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:14px">Sub-tasks ${subs.length?`<span class="small">(${d} of ${subs.length} done)</span>`:''}</b>${missing.length?`<button type="button" class="btn sm" data-action="msub-tpl">Add standard sub-tasks (${missing.length})</button>`:''}</div>
-    ${subs.length?`<div class="msubhead"><span></span><span>Sub-task</span><span>Expected date</span><span>Actual date</span><span></span></div><ul class="sublist msub" style="max-width:none;margin:0 0 8px">${subs.map((x,i)=>`<li class="${x.done?'done':''}"><input type="checkbox" class="check" style="accent-color:var(--s-done)" data-action="msub-toggle" data-i="${i}" ${x.done?'checked':''} aria-label="Done"><input class="inp" data-action="msub-name" data-i="${i}" value="${esc(x.name)}" aria-label="Sub-task name"><input class="inp ${stOverdue(x)?'err':''}" type="date" data-action="msub-exp" data-i="${i}" value="${esc(x.expectedDate||'')}" aria-label="Expected date" title="${stOverdue(x)?'Overdue':''}"><input class="inp" type="date" data-action="msub-donedate" data-i="${i}" value="${esc(x.doneDate||'')}" max="${TODAY}" aria-label="Actual completion date"><button type="button" class="iconbtn" data-action="msub-del" data-i="${i}" aria-label="Remove sub-task">${ICON.x}</button></li>`).join('')}</ul>`:'<p class="small" style="margin:6px 0 8px">No sub-tasks. Add steps that must be done before this task can be completed.</p>'}
-    <div class="addrow"><input class="inp" id="msub-new" placeholder="Add a sub-task and press Enter"><button type="button" class="btn sm" data-action="msub-add">Add</button></div>`;
+    ${subs.length?`<div class="msubhead"><span></span><span>Sub-task</span><span>Expected date</span><span>Actual date</span><span></span></div><ul class="sublist msub" style="max-width:none;margin:0 0 8px">${subs.map((x,i)=>`<li class="${x.done?'done':''}"><input type="checkbox" class="check" style="accent-color:var(--s-done)" data-action="msub-toggle" data-i="${i}" ${x.done?'checked':''} aria-label="Done"><input class="inp" data-action="msub-name" data-i="${i}" value="${esc(x.name)}" aria-label="Sub-task name"><input class="inp ${stOverdue(x)||!x.expectedDate?'err':''}" type="date" data-action="msub-exp" data-i="${i}" value="${esc(x.expectedDate||'')}" aria-label="Expected date" title="${stOverdue(x)?'Overdue':''}"><input class="inp" type="date" data-action="msub-donedate" data-i="${i}" value="${esc(x.doneDate||'')}" max="${TODAY}" aria-label="Actual completion date"><button type="button" class="iconbtn" data-action="msub-del" data-i="${i}" aria-label="Remove sub-task">${ICON.x}</button></li>`).join('')}</ul>`:'<p class="small" style="margin:6px 0 8px">No sub-tasks. Add steps that must be done before this task can be completed.</p>'}
+    <div class="addrow" style="flex-wrap:wrap"><input class="inp" id="msub-new" placeholder="New sub-task name" style="flex:1 1 200px"><input class="inp" type="date" id="msub-new-date" value="${esc(f?.expectedDate?.value||'')}" aria-label="Expected date of new sub-task" title="Expected date (required)" style="width:160px"><button type="button" class="btn sm" data-action="msub-add">Add</button></div>
+    ${subs.some(x=>!x.expectedDate)?`<p class="small" style="margin:8px 0 0;color:var(--s-late)">Every sub-task needs an expected date. <button type="button" class="linkbtn" data-action="msub-filldates">Use the task’s expected date for the blanks</button></p>`:''}`;
 }
 /* mode: 'edit' (id), 'new' (gid), 'dup' (id = source) */
 function bauTaskModal(id,gid,mode){
@@ -1098,7 +1260,7 @@ function bauTaskModal(id,gid,mode){
     <div class="g2"><label class="f">Period<input class="inp" name="period" maxlength="40" value="${esc(v.period)}" placeholder="e.g. Sep 2026, Q3 2026, FY2026"></label>
     <label class="f">Frequency<select class="inp" name="frequency">${opts(FREQS,v.frequency||'Monthly')}</select></label></div>
     ${mode==='dup'?`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="small" style="font-weight:600;color:var(--ink)">Move expected date forward:</span>${[1,3,6,12].map(k=>`<button type="button" class="btn sm" onclick="bauShift(this.form,${k})">+${k} month${k>1?'s':''}</button>`).join('')}<span class="hint" id="dup-when"></span></div>`:''}
-    <div class="g3"><label class="f">Expected completion *<input class="inp" type="date" name="expectedDate" data-req value="${esc(v.expectedDate||'')}" oninput="const n=this.form.querySelector('#dup-when');if(n&&this.value)n.textContent='Will appear under '+monthLabel(this.value.slice(0,7))+'.'"></label>
+    <div class="g3"><label class="f">Expected completion *<input class="inp" type="date" name="expectedDate" data-req value="${esc(v.expectedDate||'')}" onchange="(window.__msubs||[]).forEach(x=>{if(!x.expectedDate)x.expectedDate=this.value});renderModalSubs()" oninput="const n=this.form.querySelector('#dup-when');if(n&&this.value)n.textContent='Will appear under '+monthLabel(this.value.slice(0,7))+'.'"></label>
     <label class="f">Actual completion<input class="inp" type="date" name="completedDate" value="${esc(v.completedDate||'')}" max="${TODAY}"><span class="hint">${'Filled in automatically when Completed'}</span></label>
     <label class="f">Status<select class="inp" name="status" onchange="const a=this.form.completedDate;if(this.value==='Completed'){if(!a.value)a.value='${TODAY}'}else a.value=''">${opts(BAU_STATUSES,v.status||'Not Started')}</select></label></div>
     <div class="g3"><label class="f">PIC (maker) *<input class="inp" name="pic" data-req list="bau-ppl" value="${esc(v.pic)}"></label>
@@ -1117,8 +1279,10 @@ function bauTaskModal(id,gid,mode){
       const q=mode==='edit'?clone(src):{id:uid('b'),createdDate:TODAY,order:Date.now()};
       Object.assign(q,{groupId:gv('groupId'),name:gv('name'),period:gv('period'),frequency:gv('frequency'),category:gv('category'),expectedDate:gv('expectedDate'),completedDate:gv('completedDate'),status:gv('status')||'Not Started',pic:gv('pic'),backupPic:gv('backupPic'),reviewer:gv('reviewer'),estHours:gv('estHours')?Number(gv('estHours')):'',linkedProjectId:gv('linkedProjectId'),description:gv('description'),remarks:gv('remarks')});
       if(q.completedDate&&q.status!=='Completed'&&q.status!=='Pending Review')q.status='Completed';
-      const pend=($('#msub-new')?.value||'').trim();if(pend)(window.__msubs||(window.__msubs=[])).push({id:uid('s'),name:pend,done:false,doneDate:''});
+      const pend=($('#msub-new')?.value||'').trim();if(pend)(window.__msubs||(window.__msubs=[])).push({id:uid('s'),name:pend,expectedDate:$('#msub-new-date')?.value||gv('expectedDate'),done:false,doneDate:''});
       q.subtasks=(window.__msubs||[]).map(x=>({...x,name:String(x.name||'').trim()})).filter(x=>x.name);
+      const noDate=q.subtasks.filter(x=>!x.expectedDate);
+      if(noDate.length){toast(`Set an expected date for ${plural(noDate.length,'sub-task')}: ${noDate.map(x=>x.name).slice(0,3).join(', ')}${noDate.length>3?'…':''}`,true);renderModalSubs();$('#msubs')?.scrollIntoView({block:'center'});return false}
       if((q.status==='Completed'||q.status==='Pending Review')&&subOpen(q)){mark(f.status,`Finish all sub-tasks first (${subDone(q)} of ${subsOfT(q).length} done)`);return false}
       if(mode!=='edit'){q.preparedDate='';q.reviewedBy=''}
       await Store.save('bauTasks',normTask(q));if(mode!=='edit'&&q.expectedDate){const ym=q.expectedDate.slice(0,7);S.bau.month=ym===curMonth()?'':ym;renderMain()}toast(mode==='edit'?'BAU task saved':mode==='dup'?`Copy created under ${monthLabel(q.expectedDate.slice(0,7))}`:'BAU task added');return true}});
@@ -1156,7 +1320,7 @@ window.bauDupPreview=function(f){
 async function addBauExamples(){
   const m0=curMonth(),m1=monthAdd(m0,1);const d=(ym,day)=>`${ym}-${pad(day)}`;
   const mk=async(g,tasks)=>{const gid=uid('g');await Store.save('bauGroups',{id:gid,createdDate:TODAY,order:Date.now(),description:'Example, edit or delete',...g});
-    for(const x of tasks)await Store.save('bauTasks',normTask({subtasks:(g.template||[]).map(n=>({id:uid('s'),name:n,done:false,doneDate:''})),id:uid('b'),groupId:gid,createdDate:TODAY,order:Date.now(),description:'',backupPic:'',estHours:'',linkedProjectId:'',remarks:'',completedDate:'',preparedDate:'',status:'Not Started',reviewer:'',...x}));return gid};
+    for(const x of tasks)await Store.save('bauTasks',normTask({subtasks:(g.template||[]).map((n,i,arr)=>({id:uid('s'),name:n,expectedDate:x.expectedDate?shiftDays(x.expectedDate,i-arr.length+1):'',done:false,doneDate:''})),id:uid('b'),groupId:gid,createdDate:TODAY,order:Date.now(),description:'',backupPic:'',estHours:'',linkedProjectId:'',remarks:'',completedDate:'',preparedDate:'',status:'Not Started',reviewer:'',...x}));return gid};
   const pm=monShort(monthAdd(m0,-1));
   const g1=await mk({name:'Regulatory Reporting',owner:'DAT',entity:'Malaysian Re',template:['Extract data from source system','Reconcile to GL','Prepare submission template','Reviewer sign-off']},[
     {name:`BNM monthly statistical return – ${pm}`,period:pm,frequency:'Monthly',category:'Regulatory reporting',expectedDate:d(m0,14),pic:'DAT',reviewer:'Finance Manager',estHours:6},
@@ -1189,6 +1353,230 @@ async function migrateLegacyBau(){
   }catch(e){console.warn('BAU conversion skipped',e)}
 }
 
+/* =========================================================
+   TEAM DIRECTORY & REMINDERS
+   Team directory (meta/team): name + work email + role. Links
+   sign-in to a PIC name ("Me") and keeps names consistent.
+   Reminder panel: bell button bottom-right. Shows project
+   reminders in the Projects area and BAU reminders in BAU.
+   ========================================================= */
+S.team=[];S.remind={open:false,who:''};
+const normName=n=>String(n||'').trim().toLowerCase();
+function teamFromStore(){try{const t=JSON.parse(lsGet('dat-pm-team','null'));if(Array.isArray(t))S.team=t}catch(e){}}
+async function saveTeam(list){
+  S.team=list;
+  if(S.mode==='firebase'&&DB){try{await DB.collection('meta').doc('team').set({people:list,lastUpdated:TODAY})}catch(e){writeErr(e)}}
+  else lsSet('dat-pm-team',JSON.stringify(list));
+  refresh();
+}
+function myName(){
+  const em=normName(S.auth?.email);
+  if(em){const p=S.team.find(x=>normName(x.email)===em);if(p)return p.name}
+  return lsGet('dat-pm-me','')||'';
+}
+const teamNames=()=>S.team.map(p=>p.name).filter(Boolean);
+/* ---- collect reminders ---- */
+function remindItems(area){
+  const items=[];const add=o=>items.push(o);
+  const soon=d=>d&&diffDays(TODAY,d)<=7;
+  if(area==='projects'){
+    for(const p of activeProjects()){
+      const od=projOverdue(p);
+      if(p.status!=='Completed'&&p.dueDate&&(od||soon(p.dueDate)))add({sec:od?'overdue':'soon',who:p.pic,role:'Project owner',title:p.name,ctx:'Main project',date:p.dueDate,nav:'p:'+p.id});
+      for(const s of subsOf(p.id)){
+        if(s.status==='Completed'||(Number(s.progress)||0)>=100||s.status==='On Hold'||!s.dueDate)continue;
+        if(s.dueDate<TODAY||soon(s.dueDate))add({sec:s.dueDate<TODAY?'overdue':'soon',who:s.pic,role:'PIC',title:s.name,ctx:`Sub-project · ${p.name}`,date:s.dueDate,nav:'p:'+p.id});
+      }
+      for(const i of issuesOf(p.id)){
+        if(i.status==='Resolved'||!i.targetDate)continue;
+        if(i.targetDate<TODAY||soon(i.targetDate))add({sec:i.targetDate<TODAY?'overdue':'soon',who:i.pic,role:'Issue PIC',title:i.description,ctx:`Issue (${i.priority}) · ${p.name}`,date:i.targetDate,nav:'p:'+p.id});
+      }
+    }
+  }else{
+    for(const t of S.bauTasks){
+      if(!isLive(t)||isDone(t))continue;const g=groupById(t.groupId)?.name||'Ungrouped';const ctx=`${g}${t.period?' · '+t.period:''}`;
+      if(t.status==='Pending Review'){add({sec:'review',who:t.reviewer||'(no reviewer)',role:'Reviewer',title:t.name,ctx:`Prepared by ${t.pic||'—'}${t.preparedDate?' on '+fmt(t.preparedDate):''} · ${g}`,date:expOf(t),task:t.id});continue}
+      if(t.returnedDate&&t.status==='In Progress')add({sec:'returned',who:t.pic,role:'PIC',title:t.name,ctx:`Returned ${fmt(t.returnedDate)}${t.returnedBy?' by '+t.returnedBy:''} · ${g}`,date:expOf(t),task:t.id});
+      else if(expOf(t)&&(expOf(t)<TODAY||soon(expOf(t))))add({sec:expOf(t)<TODAY?'overdue':'soon',who:t.pic,role:'PIC',title:t.name,ctx,date:expOf(t),task:t.id});
+      for(const x of subsOfT(t)){if(x.done||!x.expectedDate)continue;if(x.expectedDate<TODAY||soon(x.expectedDate))add({sec:x.expectedDate<TODAY?'overdue':'soon',who:t.pic,role:'PIC',title:`↳ ${x.name}`,ctx:`Sub-task of ${t.name}`,date:x.expectedDate,task:t.id})}
+    }
+  }
+  return items.sort((a,b)=>(a.date||'9').localeCompare(b.date||'9'));
+}
+const SECS=[['overdue','Overdue','var(--s-late)'],['soon','Due in the next 7 days','var(--s-hold)'],['review','Awaiting review / approval','var(--s-ip)'],['returned','Returned to preparer','var(--s-late)']];
+function canonicalWho(n){const t=S.team.find(p=>normName(p.name)===normName(n));return t?t.name:(String(n||'').trim()||'(no PIC)')}
+function renderBell(){
+  const b=$('#bellBtn');if(!b)return;
+  const locked=document.body.classList.contains('locked')||!ready();b.hidden=locked;if(locked)return;
+  const area=areaOf(S.view);const items=remindItems(area);const me=myName();
+  const mine=me?items.filter(i=>normName(canonicalWho(i.who))===normName(me)):items;
+  const n=mine.length;b.querySelector('.bdg').textContent=n>99?'99+':n;b.querySelector('.bdg').hidden=!n;
+  b.title=`${area==='bau'?'BAU':'Project'} reminders${me?` for ${me}`:''}: ${n}`;b.setAttribute('aria-label',b.title);
+  b.classList.toggle('hot',mine.some(i=>i.sec==='overdue'));
+  if(S.remind.open)renderRemindPanel();
+}
+function renderRemindPanel(){
+  const pn=$('#remindPanel');const area=areaOf(S.view);const items=remindItems(area).map(i=>({...i,who:canonicalWho(i.who)}));
+  const me=myName();const W=S.remind.who;const sel=W==='__me'?me:W;
+  const people=uniq([...items.map(i=>i.who),...teamNames()]);
+  const shown=sel?items.filter(i=>normName(i.who)===normName(sel)):items;
+  const per={};for(const i of items){const o=per[i.who]||(per[i.who]={overdue:0,soon:0,review:0,returned:0});o[i.sec]++}
+  const rows=Object.entries(per).sort((a,b)=>(b[1].overdue-a[1].overdue)||((b[1].overdue+b[1].soon+b[1].review+b[1].returned)-(a[1].overdue+a[1].soon+a[1].review+a[1].returned)));
+  const itemHTML=i=>{const dd=i.date?diffDays(TODAY,i.date):null;return `<li><button class="ritem" ${i.nav?`data-nav="${i.nav}"`:`data-action="bau-task-modal" data-t="${i.task}"`}><span class="rt">${esc(i.title)}</span><span class="small">${esc(i.ctx)}</span><span class="small"><b>${esc(i.who)}</b> · ${esc(i.role)}</span></button><span class="rd">${i.date?`<span class="small nowrap">${fmt(i.date)}</span>${dd<0?`<span class="pill">${plural(-dd,'day')} overdue</span>`:`<span class="pill ${dd>3?'q':''}">${dd===0?'Due today':'in '+plural(dd,'day')}</span>`}`:''}</span></li>`};
+  pn.innerHTML=`<div class="rp-h"><div><h2>${area==='bau'?'BAU':'Project'} reminders</h2><div class="small">${area==='bau'?'BAU tasks, sub-tasks and approvals':'Projects, sub-projects and issues'} · everyone can see all PICs</div></div><button class="iconbtn" data-action="remind-close" aria-label="Close">${ICON.x}</button></div>
+  <div class="rp-tools">
+    <select class="inp" id="rp-who" aria-label="Show reminders for"><option value="">Everyone</option>${me?`<option value="__me" ${W==='__me'?'selected':''}>Me (${esc(me)})</option>`:''}${people.map(p=>`<option value="${esc(p)}" ${W===p?'selected':''}>${esc(p)}</option>`).join('')}</select>
+    <button class="btn sm" data-action="remind-copy">${ICON.copy}Copy as message</button>
+  </div>
+  ${!me?`<p class="small rp-note">${S.mode==='firebase'?`Add your email (${esc(S.auth?.email||'')}) to the <button class="linkbtn" data-action="team-modal">Team directory</button> so “Me” works.`:`Choose who you are in the <button class="linkbtn" data-action="team-modal">Team directory</button> so “Me” works.`}</p>`:''}
+  <div class="rp-b">
+    ${!sel&&rows.length?`<div class="rp-sec"><h3>Team summary</h3><table class="t rp-sum"><thead><tr><th>Person</th><th title="Overdue">Overdue</th><th title="Due in 7 days">Soon</th>${area==='bau'?'<th title="Awaiting their review">Review</th><th title="Returned to them">Returned</th>':''}</tr></thead><tbody>${rows.map(([n,o])=>`<tr class="click" data-action="remind-who" data-k="${esc(n)}"><td><b>${esc(n)}</b></td><td>${o.overdue?`<span class="warn">${o.overdue}</span>`:'—'}</td><td>${o.soon||'—'}</td>${area==='bau'?`<td>${o.review||'—'}</td><td>${o.returned||'—'}</td>`:''}</tr>`).join('')}</tbody></table></div>`:''}
+    ${SECS.filter(([k])=>area==='bau'||k==='overdue'||k==='soon').map(([k,l,c])=>{const list=shown.filter(i=>i.sec===k);return `<div class="rp-sec"><h3><i style="background:${c}"></i>${l} <span class="small">(${list.length})</span></h3>${list.length?`<ul class="rlist">${list.map(itemHTML).join('')}</ul>`:'<p class="small" style="margin:0">Nothing here.</p>'}</div>`}).join('')}
+  </div>
+  <div class="rp-f"><button class="btn sm" data-action="team-modal">Team directory (${S.team.length})</button></div>`;
+}
+function openRemind(){S.remind.open=true;$('#remindWrap').classList.add('open');if(!S.remind.who&&myName())S.remind.who='__me';renderRemindPanel();setTimeout(()=>$('#rp-who')?.focus(),30)}
+function closeRemind(){S.remind.open=false;$('#remindWrap').classList.remove('open');$('#bellBtn')?.focus()}
+function remindText(){
+  const area=areaOf(S.view);const items=remindItems(area).map(i=>({...i,who:canonicalWho(i.who)}));const W=S.remind.who;const sel=W==='__me'?myName():W;
+  const people=sel?[sel]:uniq(items.map(i=>i.who));const lab={overdue:'Overdue',soon:'Due in the next 7 days',review:'Awaiting your review',returned:'Returned to you'};
+  const out=[];for(const p of people){const mine=items.filter(i=>normName(i.who)===normName(p));if(!mine.length)continue;
+    let t=`Hi ${p}, ${area==='bau'?'BAU':'project'} reminders from the DAT dashboard (${fmt(TODAY)}):`;
+    for(const [k] of SECS){const l=mine.filter(i=>i.sec===k);if(!l.length)continue;t+=`\n\n${lab[k]}:\n`+l.map(i=>{const dd=i.date?diffDays(TODAY,i.date):null;return `• ${i.title.replace(/^↳ /,'')}${i.title.startsWith('↳')?` (${i.ctx})`:''}${i.date?` – ${fmt(i.date)}${dd<0?` (${plural(-dd,'day')} overdue)`:''}`:''}`}).join('\n')}
+    out.push(t)}
+  return out.join('\n\n————————\n\n')||'No reminders right now.';
+}
+function teamModal(){
+  const rows=(S.team.length?S.team:[{name:'',email:S.auth?.email||'',role:''}]).map(p=>({...p}));
+  const pics=uniq([...allPics(),...S.bauTasks.flatMap(t=>[t.pic,t.reviewer,t.backupPic]),...S.bauGroups.map(g=>g.owner)]).filter(n=>!S.team.some(p=>normName(p.name)===normName(n)));
+  window.__team=rows;
+  const draw=()=>{const el=$('#team-rows');if(!el)return;el.innerHTML=window.__team.map((p,i)=>`<div class="team-row"><input class="inp" data-team="name" data-i="${i}" value="${esc(p.name)}" placeholder="Name as used for PIC" aria-label="Name"><input class="inp" type="email" data-team="email" data-i="${i}" value="${esc(p.email||'')}" placeholder="name@mnrb.com.my" aria-label="Work email"><input class="inp" data-team="role" data-i="${i}" value="${esc(p.role||'')}" placeholder="e.g. Reviewer" list="team-roles" aria-label="Role"><button type="button" class="iconbtn" data-action="team-del" data-i="${i}" aria-label="Remove">${ICON.x}</button></div>`).join('')};
+  window.__teamDraw=draw;
+  openModal({title:'Team directory',body:`<p class="small" style="margin:0">Names here appear in PIC and reviewer lists, and the email links each person’s sign-in to “Me” in reminders. Use the same spelling as in tasks.</p>
+    <div class="team-head"><span>Name</span><span>Work email</span><span>Role</span><span></span></div><div id="team-rows"></div>
+    <datalist id="team-roles"><option value="Maker"><option value="Reviewer"><option value="Manager"><option value="Head of Department"></datalist>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-action="team-add">${ICON.plus}Add person</button>${pics.length?`<button type="button" class="btn sm" data-action="team-import" title="${esc(pics.join(', '))}">Add names already used as PIC (${pics.length})</button>`:''}</div>
+    ${S.mode!=='firebase'?`<label class="f">I am<select class="inp" name="me"><option value="">—</option>${uniq([...teamNames(),...pics]).map(n=>`<option ${n===lsGet('dat-pm-me','')?'selected':''}>${esc(n)}</option>`).join('')}</select><span class="hint">Remembered on this device.</span></label>`:''}`,
+    submit:'Save directory',onSubmit:async f=>{
+      const list=window.__team.map(p=>({name:String(p.name||'').trim(),email:String(p.email||'').trim().toLowerCase(),role:String(p.role||'').trim()})).filter(p=>p.name);
+      const dup=list.find((p,i)=>list.findIndex(q=>normName(q.name)===normName(p.name))!==i);if(dup){toast(`“${dup.name}” is listed twice.`,true);return false}
+      const bad=list.find(p=>p.email&&!/^[^@\s]+@[^@\s]+$/.test(p.email));if(bad){toast(`Check the email for ${bad.name}.`,true);return false}
+      if(f.me)lsSet('dat-pm-me',f.me.value);
+      await saveTeam(list);toast('Team directory saved');return true}});
+  setTimeout(draw,20);
+}
+
+/* =========================================================
+   VISUALISATION & BAU GANTT
+   ========================================================= */
+function barList(items,opts={}){
+  if(!items.length)return `<p class="small" style="margin:0">${opts.empty||'No data yet.'}</p>`;
+  const max=opts.max||Math.max(...items.map(i=>i.value),1);
+  return `<div class="vbars">${items.map(i=>`<${i.nav||i.action?'button':'div'} class="vbar" ${i.nav?`data-nav="${i.nav}"`:''} ${i.action?`data-action="${i.action}" ${i.data||''}`:''} title="${esc(i.title||i.label)}">
+    <span class="vl">${esc(i.label)}${i.sub?`<small>${esc(i.sub)}</small>`:''}</span>
+    <span class="vt">${i.parts?i.parts.map(p=>`<i style="width:${p.value/max*100}%;background:${p.color}" title="${esc(p.label)}: ${p.value}"></i>`).join(''):`<i style="width:${Math.max(0,i.value)/max*100}%;background:${i.color||'var(--accent)'}"></i>`}${i.marker!=null?`<em style="left:${Math.min(100,Math.max(0,i.marker))}%" title="Time elapsed"></em>`:''}</span>
+    <span class="vv">${esc(i.display??i.value)}</span></${i.nav||i.action?'button':'div'}>`).join('')}</div>${opts.legend?`<div class="vlegend">${opts.legend.map(([l,c])=>`<span><i style="background:${c}"></i>${esc(l)}</span>`).join('')}</div>`:''}`;
+}
+function renderProjectViz(){
+  const ps=activeProjects();const rows=ps.map(p=>({p,prog:progressOf(p),od:projOverdue(p)}));const n=rows.length;
+  if(!n)return `<header class="page-h"><div><h1>Project visualisation</h1></div></header><div class="panel">${emptyState('No projects yet','Add a project to see charts here.',`<button class="btn primary" data-nav="add">${ICON.plus}Add project</button>`)}</div>`;
+  const c=countBy(rows,r=>r.p.status);
+  const elapsed=p=>{if(!p.startDate||!p.dueDate)return null;const tot=diffDays(p.startDate,p.dueDate)||1;return Math.max(0,Math.min(100,diffDays(p.startDate,TODAY)/tot*100))};
+  const progItems=rows.slice().sort((a,b)=>b.prog-a.prog).map(r=>({label:r.p.name,sub:`${r.p.pic||'—'} · due ${fmt(r.p.dueDate)}`,value:r.prog,max:100,display:Math.round(r.prog)+'%',color:`var(--s-${SCLS[r.p.status]||'ip'})`,marker:r.p.status==='Completed'?null:elapsed(r.p),nav:'p:'+r.p.id}));
+  const sch=countBy(rows,r=>{const k=projSched(r.p).k;return k==='early'||k==='late'||k==='done'?'Completed':k==='overdue'?'Overdue':k==='soon'?'Due within 7 days':'On track'});
+  const schItems=[['On track','var(--s-ip)'],['Due within 7 days','var(--s-hold)'],['Overdue','var(--s-late)'],['Completed','var(--s-done)']].map(([l,col])=>({label:l,value:sch[l]||0,color:col}));
+  const oi=S.issues.filter(i=>i.status!=='Resolved'&&!projById(i.projectId)?.archived);const pc=countBy(oi,i=>i.priority);
+  const issueItems=PRIORITIES.slice().reverse().map(p=>({label:p,value:pc[p]||0,color:`var(--p-${PCLS[p]})`}));
+  const subs=S.subs.filter(s=>!projById(s.projectId)?.archived);const ss=countBy(subs,s=>s.status);
+  const subItems=CHART_ORDER.map(st=>({label:st,value:ss[st]||0,color:`var(--s-${SCLS[st]})`})).filter(i=>i.label!=='On Hold'||i.value);
+  const byPic={};for(const s of subs){if(s.status==='Completed'||(Number(s.progress)||0)>=100)continue;const k=s.pic||'—';const o=byPic[k]||(byPic[k]={open:0,late:0});o.open++;if(subOverdue(s))o.late++}
+  const picItems=Object.entries(byPic).sort((a,b)=>b[1].open-a[1].open).map(([k,o])=>({label:k,value:o.open,display:`${o.open}${o.late?` · ${o.late} late`:''}`,parts:[{label:'Overdue',value:o.late,color:'var(--s-late)'},{label:'On track',value:o.open-o.late,color:'var(--s-ip)'}]}));
+  const picMax=Math.max(...picItems.map(i=>i.value),1);
+  return `
+  <header class="page-h"><div><h1>Project visualisation</h1><p class="sub">${plural(n,'active project')} as at ${fmt(TODAY)}. Click a chart item to drill down.</p></div></header>
+  <div class="vgrid">
+    <section class="panel"><div class="panel-h"><h2>Project status</h2><div class="seg-toggle" role="group" aria-label="Chart type"><button data-action="dash-chart" data-k="donut" aria-pressed="${S.dash.chart==='donut'}">Donut</button><button data-action="dash-chart" data-k="bar" aria-pressed="${S.dash.chart==='bar'}">Bar</button></div></div>
+      ${chartBlock(c,n,S.dash.chart,'','viz-pstatus')}<p class="small" style="margin:12px 0 0">Reported status. Click a status to see those projects in Summary.</p></section>
+    <section class="panel"><div class="panel-h"><h2>Schedule health</h2><span class="meta">By expected completion date</span></div>${barList(schItems)}</section>
+    <section class="panel span2"><div class="panel-h"><h2>Progress by project</h2><span class="meta">The thin line marks how much of the timeline has passed</span></div>
+      ${barList(progItems,{max:100,legend:[['Completed','var(--s-done)'],['In progress','var(--s-ip)'],['Delayed','var(--s-late)'],['Not started','var(--s-ns)']]})}
+      <p class="small" style="margin:10px 0 0">A bar shorter than its line is behind the time elapsed; longer means ahead.</p></section>
+    <section class="panel"><div class="panel-h"><h2>Sub-projects by status</h2><span class="meta">${plural(subs.length,'sub-project')}</span></div>${barList(subItems)}</section>
+    <section class="panel"><div class="panel-h"><h2>Open issues by priority</h2><span class="meta">${plural(oi.length,'open issue')}</span></div>${barList(issueItems)}</section>
+    <section class="panel span2"><div class="panel-h"><h2>Open sub-projects by PIC</h2><span class="meta">Red part is overdue</span></div>${barList(picItems,{max:picMax,empty:'No open sub-projects.'})}</section>
+  </div>`;
+}
+function renderBauViz(){
+  const ym=curMonth();const groups=bauGroupsSorted();
+  if(!groups.length)return `<header class="page-h"><div><h1>BAU visualisation</h1></div></header><div class="panel">${emptyState('No BAU groups yet','Add a BAU group to see charts here.',`<button class="btn primary" data-action="bau-group-modal">${ICON.plus}Add BAU group</button>`)}</div>`;
+  const D=S.bauD;const gRows=groups.map(g=>({g,rows:monthRows(ym,g.id)})).map(r=>({...r,status:groupStatus(r.rows),s:bauStats(r.rows)}));
+  const counts=countBy(gRows,r=>r.status);
+  const all=monthRows(ym).map(r=>r.t);const tc=countBy(all,t=>isOverdue(t)?'Overdue':t.status||'Not Started');
+  const taskItems=[['Completed','var(--s-done)'],['Pending Review','var(--s-hold)'],['In Progress','var(--s-ip)'],['Not Started','var(--s-ns)'],['Overdue','var(--s-late)'],['Not Applicable','var(--faint)']].map(([l,col])=>({label:l,value:tc[l]||0,color:col})).filter(i=>i.value||['Completed','Overdue'].includes(i.label));
+  const grpItems=gRows.map(r=>({label:r.g.name,sub:r.status,value:r.s.total,display:`${r.s.done}/${r.s.total}`,parts:[{label:'Completed',value:r.s.done,color:'var(--s-done)'},{label:'Pending review',value:r.s.pending,color:'var(--s-hold)'},{label:'Overdue',value:r.s.overdue,color:'var(--s-late)'},{label:'Open',value:Math.max(0,r.s.total-r.s.done-r.s.pending-r.s.overdue),color:'var(--line)'}],nav:'g:'+r.g.id}));
+  const trend=onTimeTrend(6);
+  const byPic={};for(const t of bauRowsFor(ym).map(r=>r.t)){if(!isLive(t))continue;const k=t.pic||'—';const o=byPic[k]||(byPic[k]={n:0,done:0,hrs:0});o.n++;if(isDone(t))o.done++;o.hrs+=Number(t.estHours)||0}
+  const picItems=Object.entries(byPic).sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>({label:k,sub:o.hrs?`${Math.round(o.hrs*10)/10} est. hours`:'',value:o.n,display:`${o.done}/${o.n}`,parts:[{label:'Completed',value:o.done,color:'var(--s-done)'},{label:'Open',value:o.n-o.done,color:'var(--s-ip)'}]}));
+  const cat=countBy(all.filter(isLive),t=>t.category||'Uncategorised');const catItems=Object.entries(cat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({label:k,value:v,color:'var(--accent)'}));
+  return `
+  <header class="page-h"><div><h1>BAU visualisation</h1><p class="sub">${monthLabel(ym)}, by expected completion date. Click a group to open it.</p></div></header>
+  <div class="vgrid">
+    <section class="panel"><div class="panel-h"><h2>BAU group status</h2><div class="seg-toggle" role="group" aria-label="Chart type"><button data-action="bau-dchart" data-k="donut" aria-pressed="${D.chart==='donut'}">Donut</button><button data-action="bau-dchart" data-k="bar" aria-pressed="${D.chart==='bar'}">Bar</button></div></div>${chartBlock(counts,gRows.length,D.chart,'','viz-bstatus',GSTATUS,GCLS)}</section>
+    <section class="panel"><div class="panel-h"><h2>Tasks this month by status</h2><span class="meta">${plural(all.length,'task')}</span></div>${barList(taskItems)}</section>
+    <section class="panel span2"><div class="panel-h"><h2>Progress by BAU group</h2><span class="meta">Completed / due this month</span></div>${barList(grpItems,{max:Math.max(...grpItems.map(i=>i.value),1),legend:[['Completed','var(--s-done)'],['Pending review','var(--s-hold)'],['Overdue','var(--s-late)'],['Open','var(--line)']]})}</section>
+    <section class="panel"><div class="panel-h"><h2>On-time trend</h2><span class="meta">Last 6 months</span></div>${barList(trend.map(m=>({label:monShort(m.ym),value:m.pct??0,max:100,display:m.pct===null?'—':`${m.pct}%`,sub:m.due?`${m.onTime}/${m.due} on time`:'',color:'var(--s-done)'})),{max:100})}</section>
+    <section class="panel"><div class="panel-h"><h2>Tasks by category</h2><span class="meta">${monthLabel(ym)}</span></div>${barList(catItems)}</section>
+    <section class="panel span2"><div class="panel-h"><h2>Workload by PIC</h2><span class="meta">Completed / tasks due this month</span></div>${barList(picItems,{max:Math.max(...picItems.map(i=>i.value),1),empty:'No tasks due this month.'})}</section>
+  </div>`;
+}
+/* BAU timeline: each task is a point in time (expected date). Done tasks show a line from expected to actual date. */
+S.bgantt={preset:'quarter',from:'',to:'',grp:'',pic:'',status:''};
+function renderBauGantt(){
+  const G=S.bgantt;const groups=bauGroupsSorted();
+  const rng=k=>{const t=parse(TODAY),y=t.getFullYear(),m=t.getMonth();if(k==='month')return [iso(new Date(y,m,1)),iso(new Date(y,m+1,0))];if(k==='quarter'){const q=Math.floor(m/3)*3;return [iso(new Date(y,q,1)),iso(new Date(y,q+3,0))]}if(k==='six')return [iso(new Date(y,m-2,1)),iso(new Date(y,m+4,0))];if(k==='year')return [iso(new Date(y,0,1)),iso(new Date(y,11,31))];return ['','']};
+  let [from,to]=G.preset?rng(G.preset):[G.from,G.to];
+  const tasks=S.bauTasks.filter(t=>expOf(t)&&(!G.grp||t.groupId===G.grp)&&(!G.pic||t.pic===G.pic)&&(!G.status||(G.status==='Overdue'?isOverdue(t):t.status===G.status)));
+  if(!from||!to){const ds=tasks.flatMap(t=>[expOf(t),t.completedDate].filter(Boolean)).sort();from=from||(ds[0]?iso(new Date(parse(ds[0]).getFullYear(),parse(ds[0]).getMonth(),1)):TODAY);to=to||(ds.length?iso(new Date(parse(ds[ds.length-1]).getFullYear(),parse(ds[ds.length-1]).getMonth()+1,0)):TODAY)}
+  if(to<from)[from,to]=[to,from];
+  const span=Math.max(diffDays(from,to),1);const pos=d=>2+0.96*Math.min(100,Math.max(0,diffDays(from,d)/span*100));
+  const inRange=t=>expOf(t)>=from&&expOf(t)<=to||(t.completedDate&&t.completedDate>=from&&t.completedDate<=to);
+  const ticks=[];{let d=new Date(parse(from).getFullYear(),parse(from).getMonth(),1);const step=span>400?3:1;while(iso(d)<=to){ticks.push([iso(d)<from?from:iso(d),`${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`]);d=new Date(d.getFullYear(),d.getMonth()+step,1)}}
+  if(span<=62){ticks.length=0;let d=parse(from);d.setDate(d.getDate()-((d.getDay()+6)%7));while(iso(d)<=to){if(iso(d)>=from)ticks.push([iso(d),`${d.getDate()} ${MONTHS[d.getMonth()]}`]);d.setDate(d.getDate()+7)}}
+  const showToday=TODAY>=from&&TODAY<=to;
+  const colorOf=t=>isDone(t)?(t.completedDate<=expOf(t)?'var(--s-done)':'var(--s-hold)'):isOverdue(t)?'var(--s-late)':t.status==='Pending Review'?'var(--s-hold)':t.status==='In Progress'?'var(--s-ip)':'var(--s-ns)';
+  const presets=[['month','This month'],['quarter','This quarter'],['six','6 months'],['year','This year'],['','All / custom']];
+  const body=groups.concat(S.bauTasks.some(t=>!groupById(t.groupId))?[{id:'',name:'Ungrouped'}]:[]).map(g=>{
+    const ts=tasks.filter(t=>(t.groupId||'')===(g.id||'')&&inRange(t)).sort((a,b)=>expOf(a).localeCompare(expOf(b)));if(!ts.length)return '';
+    return `<div class="bg-group">${g.id?`<button class="pname" data-nav="g:${g.id}">${esc(g.name)}</button>`:esc(g.name)} <span class="small">${plural(ts.length,'task')}</span></div>`+ts.map(t=>{
+      const e=pos(expOf(t)),a=t.completedDate?pos(t.completedDate):null;const l=a==null?e:Math.min(e,a),r=a==null?e:Math.max(e,a);
+      const subs=subsOfT(t).filter(x=>x.expectedDate&&x.expectedDate>=from&&x.expectedDate<=to);
+      return `<div class="g-row bg-row" data-action="bau-task-modal" data-t="${t.id}" role="button" tabindex="0" aria-label="${esc(t.name)}, expected ${fmt(expOf(t))}${t.completedDate?`, completed ${fmt(t.completedDate)}`:''}">
+        <div class="g-name"><b title="${esc(t.name)}">${esc(t.name)}</b><div class="small" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="badge c-${BCLS[t.status]||'ns'}">${esc(t.status||'Not Started')}</span><span>${esc(t.pic||'—')}</span></div></div>
+        <div class="g-track">${ticks.map(([d])=>`<span class="g-grid" style="left:${pos(d)}%"></span>`).join('')}
+          ${a!=null&&r-l>0.3?`<span class="bg-link" style="left:${l}%;width:${r-l}%;background:${colorOf(t)}"></span>`:''}
+          ${subs.map(x=>`<span class="bg-sub ${x.done?'done':stOverdue(x)?'late':''}" style="left:${pos(x.expectedDate)}%" title="${esc(x.name)}: expected ${fmt(x.expectedDate)}${x.done?` · done ${fmt(x.doneDate)}`:''}"></span>`).join('')}
+          <span class="bg-exp" style="left:${e}%;--c:${colorOf(t)}" title="Expected ${fmt(expOf(t))}"></span>
+          ${a!=null?`<span class="bg-act" style="left:${a}%;--c:${colorOf(t)}" title="Completed ${fmt(t.completedDate)}"></span>`:''}
+          ${showToday?`<span class="g-today" style="left:${pos(TODAY)}%"></span>`:''}
+        </div></div>`}).join('')}).join('');
+  return `
+  <header class="page-h"><div><h1>BAU Gantt</h1><p class="sub">Each task sits at its expected completion date (◆). Completed tasks show the actual date (●) joined by a line; small dots are sub-task dates. Click a task to open it.</p></div></header>
+  <section class="filterbar" aria-label="Timeline filters">
+    <div class="chips" role="group" aria-label="Range">${presets.map(([k,l])=>`<button class="chip" data-action="bg-preset" data-k="${k}" aria-pressed="${G.preset===k}">${l}</button>`).join('')}</div>
+    ${G.preset===''?`<label class="f">From<input type="date" class="inp" id="bgf" data-bind="bgantt.from" value="${G.from}"></label><label class="f">To<input type="date" class="inp" id="bgt" data-bind="bgantt.to" value="${G.to}"></label>`:''}
+    <label class="f">BAU group<select class="inp" id="bgg" data-bind="bgantt.grp"><option value="">All groups</option>${groups.map(g=>`<option value="${g.id}" ${g.id===G.grp?'selected':''}>${esc(g.name)}</option>`).join('')}</select></label>
+    <label class="f">PIC<select class="inp" id="bgp" data-bind="bgantt.pic">${opts(uniq(S.bauTasks.map(t=>t.pic)),G.pic,'All PICs')}</select></label>
+    <label class="f">Status<select class="inp" id="bgs" data-bind="bgantt.status">${opts([...BAU_STATUSES,'Overdue'],G.status,'All statuses')}</select></label>
+  </section>
+  <section class="panel flush">
+    ${body?`<div class="tw"><div class="gantt">
+      <div class="g-head"><div class="g-label">Task · ${fmt(from)} – ${fmt(to)}</div><div class="g-scale">${ticks.map(([d,l])=>`<span style="left:${pos(d)}%">${l}</span>`).join('')}</div></div>
+      ${body}</div></div>
+      <div class="g-legend"><span><i style="--c:var(--s-done)"></i>Done on time</span><span><i style="--c:var(--s-hold)"></i>Done late / pending review</span><span><i style="--c:var(--s-ip)"></i>In progress</span><span><i style="--c:var(--s-ns)"></i>Not started</span><span><i style="--c:var(--s-late)"></i>Overdue</span>${showToday?`<span><i style="--c:var(--s-late);width:2px;border-radius:0"></i>Today</span>`:''}</div>`
+    :emptyState('No BAU tasks in this range','Try a wider range or clear a filter.')}
+  </section>`;
+}
+
 function renderDashboard(){
   const ps=activeProjects();const rows=ps.map(p=>({p,prog:progressOf(p),od:projOverdue(p)}));
   const n=rows.length;const c=countBy(rows,r=>r.p.status);
@@ -1216,11 +1604,12 @@ function renderDashboard(){
     ${kpi('Not started',c['Not Started']||0,pct(c['Not Started']||0,n)+'% of total','var(--s-ns)','Not Started')}
   </section>
   <div class="grid2" style="margin-bottom:16px">
-    <section class="panel"><div class="panel-h"><h2>Project status</h2><div class="seg-toggle" role="group" aria-label="Chart type"><button data-action="dash-chart" data-k="donut" aria-pressed="${S.dash.chart==='donut'}">Donut</button><button data-action="dash-chart" data-k="bar" aria-pressed="${S.dash.chart==='bar'}">Bar</button></div></div>
-      ${chartBlock(c,n,S.dash.chart,f,'dash-focus')}
-      <p class="small" style="margin:12px 0 0">Based on each project’s reported status. Select a status to filter the project summary.</p></section>
     <section class="panel"><div class="panel-h"><h2>Sub-projects due soon or overdue</h2><span class="meta">Next 14 days</span></div>
       ${soon.length?`<ul class="list">${soon.slice(0,7).map(({p,s,dd})=>`<li><div><button class="l1" data-nav="p:${p.id}">${esc(s.name)}</button><div class="small">${esc(p.name)} · ${esc(s.pic||'—')}</div></div><div style="text-align:right"><div class="nowrap small">${fmt(s.dueDate)}</div>${dd<0?`<span class="pill">${plural(-dd,'day')} overdue</span>`:`<span class="pill ${dd>7?'q':''}">${dd===0?'Due today':'in '+plural(dd,'day')}</span>`}</div></li>`).join('')}</ul>${soon.length>7?`<p class="small" style="margin:8px 0 0">+${soon.length-7} more</p>`:''}`:emptyState('Nothing due in the next 14 days','')}
+    </section>
+    <section class="panel"><div class="panel-h"><h2>Open issues</h2><button class="btn sm" data-nav="pviz">View charts</button></div>
+      ${(()=>{const oi=S.issues.filter(i=>i.status!=='Resolved'&&projById(i.projectId)&&!projById(i.projectId).archived).sort((a,b)=>PRIORITIES.indexOf(b.priority)-PRIORITIES.indexOf(a.priority)||(a.targetDate||'9').localeCompare(b.targetDate||'9'));
+        return oi.length?`<ul class="list">${oi.slice(0,7).map(i=>`<li><div><button class="l1" data-nav="p:${i.projectId}">${esc(i.description)}</button><div class="small">${esc(projById(i.projectId)?.name)} · ${esc(i.pic||'—')}${i.targetDate?` · target ${fmt(i.targetDate)}`:''}</div></div>${pbadge(i.priority)}</li>`).join('')}</ul>${oi.length>7?`<p class="small" style="margin:8px 0 0">+${oi.length-7} more</p>`:''}`:emptyState('No open issues','')})()}
     </section>
   </div>
   <section class="panel flush">
@@ -1564,6 +1953,9 @@ function renderMain(){
   if(S.view==='add'){if(!main.querySelector('#pform'))main.innerHTML=banner+renderAdd();return}
   let html;
   if(S.view==='gantt')html=renderGantt();
+  else if(S.view==='pviz')html=renderProjectViz();
+  else if(S.view==='bviz')html=renderBauViz();
+  else if(S.view==='bgantt')html=renderBauGantt();
   else if(S.view==='bau')html=renderBauDashboard();
   else if(S.view==='bauchk')html=renderBauChecklist();
   else if(S.view.startsWith('g:')){const g=groupById(S.view.slice(2));if(!g){S.view='bau';html=renderBauDashboard()}else html=renderBauGroup(g)}
@@ -1573,11 +1965,11 @@ function renderMain(){
   for(const k in keep){const x=document.getElementById(k);if(x&&x.type!=='number'&&keep[k]!==undefined)x.value=keep[k]}
   if(fid){const x=document.getElementById(fid);if(x){x.focus({preventScroll:true});if(sel&&sel[0]!=null)try{x.setSelectionRange(sel[0],sel[1])}catch(e){}}}
 }
-function refresh(){renderTabs();renderMain()}
+function refresh(){renderTabs();renderMain();renderBell()}
 function go(v){
   if(S.bauSel)S.bauSel={on:false,ids:new Set()};
   if(S.view!==v&&areaOf(v)!==areaOf(S.view)&&S.bau)S.bau.month='';
-  S.view=v;closeMore();S.moreQ='';renderTabs();$('#main').innerHTML='';renderMain();window.scrollTo(0,0);
+  S.view=v;closeMore();S.moreQ='';renderTabs();$('#main').innerHTML='';renderMain();renderBell();window.scrollTo(0,0);
   const t=$('#ptitle');if(t)t.focus({preventScroll:true});else $('#main').focus({preventScroll:true});
   lsSet('dat-pm-view',v);
 }
@@ -1587,6 +1979,8 @@ function go(v){
    ========================================================= */
 document.addEventListener('click',async e=>{
   const nav=e.target.closest('[data-nav]');
+  if(nav&&!e.target.closest('select,input')&&nav.closest('#remindPanel'))closeRemind();
+  if(nav&&nav.closest('#side'))document.body.classList.remove('side-open');
   if(nav&&!e.target.closest('select,input')){if($('#modalWrap').classList.contains('open')&&!nav.closest('#modal'))return;if(nav.closest('#modal'))closeModal();go(nav.dataset.nav);return}
   if(e.target.closest('#moreBtn')){$('#morePanel').classList.contains('open')?closeMore():openMore();return}
   if($('#morePanel').classList.contains('open')&&!e.target.closest('#morePanel'))closeMore();
@@ -1594,6 +1988,19 @@ document.addEventListener('click',async e=>{
   if(t.tagName==='SELECT'||t.tagName==='INPUT')return;
   switch(a){
     case 'close-modal':closeModal();break;
+    case 'remind-open':openRemind();break;
+    case 'viz-pstatus':S.dash.focus=t.dataset.status;go('dashboard');break;
+    case 'viz-bstatus':S.bauD.focus=t.dataset.status;go('bau');break;
+    case 'bg-preset':S.bgantt.preset=t.dataset.k;renderMain();break;
+    case 'side-toggle':document.body.classList.toggle('side-open');break;
+    case 'side-arch':S.sideArch=!S.sideArch;renderTabs();break;
+    case 'remind-close':closeRemind();break;
+    case 'remind-who':S.remind.who=t.dataset.k;renderRemindPanel();break;
+    case 'remind-copy':copy(remindText());break;
+    case 'team-modal':teamModal();break;
+    case 'team-add':window.__team.push({name:'',email:'',role:''});window.__teamDraw();document.querySelector(`[data-team="name"][data-i="${window.__team.length-1}"]`)?.focus();break;
+    case 'team-del':window.__team.splice(+t.dataset.i,1);window.__teamDraw();break;
+    case 'team-import':{const have=new Set(window.__team.map(p=>normName(p.name)));uniq([...allPics(),...S.bauTasks.flatMap(x=>[x.pic,x.reviewer,x.backupPic]),...S.bauGroups.map(g=>g.owner)]).filter(n=>!have.has(normName(n))).forEach(n=>window.__team.push({name:n,email:'',role:''}));window.__teamDraw();t.remove();break}
     case 'auth':authAction(t.dataset.k,null);break;
     case 'auth-view':S.auth.view=t.dataset.k;S.auth.msg='';S.auth.ok='';renderMain();break;
     case 'backups':backupsModal();break;
@@ -1610,16 +2017,17 @@ document.addEventListener('click',async e=>{
     case 'bau-sel-mode':S.bauSel={on:!S.bauSel.on,ids:new Set()};renderMain();break;
     case 'bau-sel-all':{const box=[...document.querySelectorAll('[data-action="bau-sel"]')];const allOn=box.every(b=>S.bauSel.ids.has(b.dataset.t));box.forEach(b=>allOn?S.bauSel.ids.delete(b.dataset.t):S.bauSel.ids.add(b.dataset.t));renderMain();break}
     case 'bau-dup-many':bauDupManyModal([...S.bauSel.ids]);break;
-    case 'msub-add':{const inp=$('#msub-new');const n=(inp?.value||'').trim();if(!n){inp?.focus();break}window.__msubs.push({id:uid('s'),name:n,expectedDate:'',done:false,doneDate:''});renderModalSubs();$('#msub-new')?.focus();break}
+    case 'msub-add':{const inp=$('#msub-new'),di=$('#msub-new-date');const n=(inp?.value||'').trim(),dt=di?.value||'';if(!n){inp?.focus();break}if(!dt){di.classList.add('err');di.focus();toast('Set the sub-task’s expected date.',true);break}window.__msubs.push({id:uid('s'),name:n,expectedDate:dt,done:false,doneDate:''});renderModalSubs();$('#msub-new')?.focus();break}
+    case 'msub-filldates':{const d=$('#mform')?.expectedDate?.value;if(!d){toast('Set the task’s expected completion date first.',true);break}(window.__msubs||[]).forEach(x=>{if(!x.expectedDate)x.expectedDate=d});renderModalSubs();break}
     case 'msub-del':window.__msubs.splice(+t.dataset.i,1);renderModalSubs();break;
-    case 'msub-tpl':{const have=window.__msubs;const g=groupById($('#mform')?.groupId?.value);tplOf(g).filter(n=>!have.some(x=>x.name.trim().toLowerCase()===n.trim().toLowerCase())).forEach(n=>have.push({id:uid('s'),name:n,done:false,doneDate:''}));renderModalSubs();break}
+    case 'msub-tpl':{const have=window.__msubs;const g=groupById($('#mform')?.groupId?.value);const d=$('#mform')?.expectedDate?.value||'';tplOf(g).filter(n=>!have.some(x=>x.name.trim().toLowerCase()===n.trim().toLowerCase())).forEach(n=>have.push({id:uid('s'),name:n,expectedDate:d,done:false,doneDate:''}));renderModalSubs();break}
     case 'bau-sub-open':{const id=t.dataset.t;S.bauOpen.has(id)?S.bauOpen.delete(id):S.bauOpen.add(id);renderMain();if(S.bauOpen.has(id))$(`#sub-add-${id}`)?.focus();break}
-    case 'bau-sub-add':{const bt=bauTaskById(t.dataset.id);const inp=$(`#sub-add-${t.dataset.id}`);const name=(inp?.value||'').trim();if(!bt||!name){inp?.focus();break}inp.value='';await saveSubs(bt,[...subsOfT(bt),{id:uid('s'),name,expectedDate:'',done:false,doneDate:''}]).catch(()=>{});$(`#sub-add-${t.dataset.id}`)?.focus();break}
+    case 'bau-sub-add':{const bt=bauTaskById(t.dataset.id);const inp=$(`#sub-add-${t.dataset.id}`),di=$(`#sub-date-${t.dataset.id}`);const name=(inp?.value||'').trim(),dt=di?.value||'';if(!bt)break;if(!name){inp?.focus();break}if(!dt){di.classList.add('err');di.focus();toast('Set the sub-task’s expected date.',true);break}inp.value='';await saveSubs(bt,[...subsOfT(bt),{id:uid('s'),name,expectedDate:dt,done:false,doneDate:''}]).catch(()=>{});$(`#sub-add-${t.dataset.id}`)?.focus();break}
     case 'bau-sub-del':{const bt=bauTaskById(t.dataset.t);if(!bt)break;await saveSubs(bt,subsOfT(bt).filter(x=>x.id!==t.dataset.s)).catch(()=>{});break}
-    case 'bau-sub-tpl':{const bt=bauTaskById(t.dataset.t);if(!bt)break;const have=subsOfT(bt);const add=tplOf(groupById(bt.groupId)).filter(n=>!have.some(x=>x.name.trim().toLowerCase()===n.trim().toLowerCase())).map(n=>({id:uid('s'),name:n,done:false,doneDate:''}));await saveSubs(bt,[...have,...add],`${plural(add.length,'sub-task')} added`).catch(()=>{});break}
+    case 'bau-sub-tpl':{const bt=bauTaskById(t.dataset.t);if(!bt)break;const have=subsOfT(bt);const add=tplOf(groupById(bt.groupId)).filter(n=>!have.some(x=>x.name.trim().toLowerCase()===n.trim().toLowerCase())).map(n=>({id:uid('s'),name:n,expectedDate:expOf(bt),done:false,doneDate:''}));await saveSubs(bt,[...have,...add],`${plural(add.length,'sub-task')} added with the task’s expected date. Adjust if needed.`).catch(()=>{});break}
     case 'bau-dup-group':{const g=groupById(t.dataset.g);if(!g)break;const ym=S.bau.month||curMonth();const ids=bauRowsFor(ym,g.id).map(r=>r.t.id);bauDupManyModal(ids,`Duplicate ${g.name} – ${ym==='all'?'all tasks':monthLabel(ym)}`);break}
     case 'bau-approve':case 'bau-return':{const bt=bauTaskById(t.dataset.t);if(!bt)break;const ap=a==='bau-approve';if($('#modalWrap').classList.contains('open'))closeModal();if(ap&&blockIfOpen(bt,'Completed'))break;
-      await saveTaskPatch(bt,ap?{status:'Completed',completedDate:TODAY,reviewedBy:S.auth?.email||bt.reviewer||''}:{status:'In Progress'}).then(()=>toast(ap?'Approved':'Returned to preparer')).catch(()=>{});break}
+      await saveTaskPatch(bt,ap?{status:'Completed',completedDate:TODAY,reviewedBy:S.auth?.email||bt.reviewer||''}:{status:'In Progress',returnedDate:TODAY,returnedBy:myName()||S.auth?.email||''}).then(()=>toast(ap?'Approved':'Returned to preparer')).catch(()=>{});break}
     case 'bau-task-delete':{const bt=bauTaskById(t.dataset.t);if(!bt)break;
       confirmBox('Delete BAU task?',`<b>${esc(bt.name)}</b> will be removed. This can’t be undone.`,'Delete task',async()=>{try{await Store.remove('bauTasks',bt.id);toast('BAU task deleted')}catch(err){}});break}
     case 'bau-examples':await addBauExamples();break;
@@ -1664,6 +2072,7 @@ document.addEventListener('change',async e=>{
   if(a==='issue-status'){const i=issueById(t.dataset.id);if(t.value==='Resolved'&&!i.resolution){t.value=i.status;issueModal({id:i.id});setTimeout(()=>{const f=$('#mform');if(f){f.status.value='Resolved';f.actualDate.value=f.actualDate.value||TODAY;f.resolution.focus()}},40);return}
     const q=clone(i);q.status=t.value;if(t.value==='Resolved')q.actualDate=q.actualDate||TODAY;else q.actualDate='';await Store.save('issues',q).then(()=>toast('Issue updated')).catch(()=>{});return}
   if(a==='bau-done'||a==='bau-status'){const bt=bauTaskById(t.dataset.t);if(!bt)return;const status=a==='bau-done'?(t.checked?(bt.reviewer?'Pending Review':'Completed'):'Not Started'):t.value;if(blockIfOpen(bt,status)){if(a==='bau-done')t.checked=false;else t.value=bt.status||'Not Started';return}await saveTaskPatch(bt,{status}).then(()=>toast(status==='Completed'?'Marked completed':status==='Pending Review'?'Sent for review':'Status updated')).catch(()=>{});return}
+  if(t.id==='rp-who'){S.remind.who=t.value;renderRemindPanel();return}
   if(a==='msub-exp'){const x=window.__msubs?.[+t.dataset.i];if(x)x.expectedDate=t.value;renderModalSubs();return}
   if(a==='msub-donedate'){const x=window.__msubs?.[+t.dataset.i];if(x){x.doneDate=t.value;x.done=!!t.value}renderModalSubs();return}
   if(a==='msub-toggle'){const x=window.__msubs[+t.dataset.i];if(x){x.done=t.checked;x.doneDate=t.checked?TODAY:''}renderModalSubs();return}
@@ -1675,7 +2084,7 @@ document.addEventListener('change',async e=>{
   if(t.dataset.bind){const [grp,key]=t.dataset.bind.split('.');S[grp][key]=t.value;if(grp==='gantt'&&(key==='from'||key==='to'))S.gantt.preset=S.gantt.from||S.gantt.to?'':'all';renderMain()}
 });
 function setPath(path,val){const i=path.lastIndexOf('.');const st=stateFor(path.slice(0,i));st[path.slice(i+1)]=val;renderMain()}
-document.addEventListener('input',e=>{if(e.target.dataset.action==='msub-name'){const x=window.__msubs?.[+e.target.dataset.i];if(x)x.name=e.target.value;return}if(e.target.id==='more-q'){S.moreQ=e.target.value;renderMorePanel(false)}else if(e.target.dataset.set&&e.target.tagName==='INPUT')setPath(e.target.dataset.set,e.target.value)});
+document.addEventListener('input',e=>{if(e.target.id==='side-q'){S.sideQ=e.target.value;S.__sideFocus=true;renderTabs();return}if(e.target.dataset.team){const r=window.__team?.[+e.target.dataset.i];if(r)r[e.target.dataset.team]=e.target.value;return}if(e.target.dataset.action==='msub-name'){const x=window.__msubs?.[+e.target.dataset.i];if(x)x.name=e.target.value;return}if(e.target.id==='more-q'){S.moreQ=e.target.value;renderMorePanel(false)}else if(e.target.dataset.set&&e.target.tagName==='INPUT')setPath(e.target.dataset.set,e.target.value)});
 document.addEventListener('submit',async e=>{
   e.preventDefault();const f=e.target;const btn=f.querySelector('[type=submit]');
   if(f.id==='authform'){authAction(f.dataset.k,f);return}
@@ -1684,7 +2093,7 @@ document.addEventListener('submit',async e=>{
   if(f.id==='mform'&&modalCtx?.onSubmit){btn.disabled=true;let done=false;try{done=await modalCtx.onSubmit(f)}catch(err){done=false}if(btn.isConnected)btn.disabled=false;if(done)closeModal()}
 });
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){if($('#modalWrap').classList.contains('open'))closeModal();else if($('#morePanel').classList.contains('open')){closeMore();$('#moreBtn').focus()}}
+  if(e.key==='Escape'){if($('#modalWrap').classList.contains('open'))closeModal();else if(S.remind?.open)closeRemind();else if($('#morePanel').classList.contains('open')){closeMore();$('#moreBtn').focus()}}
   if((e.key==='Enter'||e.key===' ')&&e.target.matches('circle.seg,.g-row')){e.preventDefault();e.target.click?e.target.click():e.target.dispatchEvent(new MouseEvent('click',{bubbles:true}))}
   if(e.key==='Enter'&&(e.target.id==='msub-new'||e.target.dataset.action==='msub-name')){e.preventDefault();if(e.target.id==='msub-new')document.querySelector('[data-action="msub-add"]')?.click();return}
   if(e.key==='Enter'&&e.target.dataset.enter){e.preventDefault();document.querySelector(`[data-action="${e.target.dataset.enter}"][data-id="${e.target.dataset.id}"][data-k="${e.target.dataset.k}"]`)?.click()}
