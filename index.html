@@ -386,6 +386,16 @@ select.ssel{appearance:none;-webkit-appearance:none;border:1px solid color-mix(i
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ===== Layout v3: vertical sidebar + top view tabs ===== */
+.ent-wrap[hidden]{display:none}
+.ent-sel{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 6px 4px 12px;box-shadow:var(--shadow);font-size:13px;color:var(--muted);font-weight:600}
+.ent-sel select{border:0;background:var(--surface-2);border-radius:7px;padding:7px 8px;font-weight:600;color:var(--ink);font-size:14px}
+.ent-sel.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.ent-sel.on select{background:var(--accent);color:#fff}
+.ent-banner{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:10px;padding:11px 16px;margin-bottom:18px;font-size:14px}
+.etag{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:6px;background:var(--accent-soft);color:var(--accent);margin-left:4px;vertical-align:1px}
+.side-ent{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 4px 0;padding:8px 10px;border-radius:8px;background:rgba(118,169,245,.18);font-size:13px;color:#fff}
+.side-ent button{border:0;background:none;color:#fff;display:grid;place-items:center;padding:2px}
+.side-ent button svg{width:15px;height:15px}
 :root{--side-w:276px}
 html{scroll-padding-top:84px}
 body{font-size:15px}
@@ -499,6 +509,7 @@ button.vbar:hover{background:var(--surface-2)}
   .kpi .n{font-size:28px}
 }
 @media (max-width:620px){
+  .ent-wrap{order:4}.ent-sel span{display:none}
   .topbar{flex-wrap:wrap}
   .tb-title{flex:1 1 calc(100% - 110px)}
   .topbar .tabs{order:5;flex:1 1 100%;justify-content:stretch;margin-bottom:4px}
@@ -517,6 +528,7 @@ button.vbar:hover{background:var(--surface-2)}
   <header class="topbar" id="topbar">
     <button class="iconbtn hamb" data-action="side-toggle" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <div class="tb-title" id="tbTitle"></div>
+    <div id="entWrap" class="ent-wrap"></div>
     <nav class="tabs" id="tabs" aria-label="Views"></nav>
     <button class="tab-user" id="userBtn" data-action="user-menu" hidden title="Account">?</button>
   </header>
@@ -789,6 +801,7 @@ async function initData(){
       for(const [k,coll] of Object.entries(TABLES)){
         UNSUBS.push(db.collection(coll).onSnapshot(s=>{S[k]=s.docs.map(d=>({...clone(d.data()),id:d.id}));S.loaded[k]=true;refresh();if(ready())autoBackupOnce();if(S.loaded.bauTasks&&S.loaded.bauCycles)migrateLegacyBau()},onErr));
       }
+      if(S.mode==='firebase'){const ds=db.collection('meta').doc('settings');if(ds.onSnapshot)UNSUBS.push(ds.onSnapshot(d=>{const v=d.exists?d.data():null;S.entities=v&&Array.isArray(v.entities)?v.entities:null;refresh()},()=>{}))}
       if(S.mode==='firebase'){const dr=db.collection('meta').doc('team');if(dr.onSnapshot)UNSUBS.push(dr.onSnapshot(d=>{const v=d.exists?d.data():null;S.team=v&&Array.isArray(v.people)?v.people:[];refresh()},()=>{}))}
     };
     if(S.mode==='firebase'){startAuth(db,subscribe);return}
@@ -798,7 +811,7 @@ async function initData(){
     let d=null;try{d=JSON.parse(lsGet(LS_DATA,'null'))}catch(e){}
     if(!d){d=await fetchSample();if(d)lsSet(LS_DATA,JSON.stringify(d))}
     if(d){S.projects=d.projects||[];S.subs=d.subs||[];S.issues=d.issues||[];S.bauGroups=d.bauGroups||[];S.bauTasks=d.bauTasks||[];S.bauCycles=d.bauCycles||[]}
-    teamFromStore();
+    teamFromStore();try{const e=JSON.parse(lsGet('dat-pm-entities','null'));if(Array.isArray(e))S.entities=e}catch(e){}
     S.loaded={projects:true,subs:true,issues:true,bauGroups:true,bauTasks:true,bauCycles:true};refresh();migrateLegacyBau();
   }
 }
@@ -810,9 +823,17 @@ const ready=()=>S.loaded.projects&&S.loaded.subs&&S.loaded.issues;
 const projById=id=>S.projects.find(p=>p.id===id);
 const subById=id=>S.subs.find(s=>s.id===id);
 const issueById=id=>S.issues.find(i=>i.id===id);
-const activeProjects=()=>S.projects.filter(p=>!p.archived).sort((a,b)=>(a.order??0)-(b.order??0)||(a.createdDate||'').localeCompare(b.createdDate||''));
+/* Entity filter (optional tag on sub-projects). When set, projects show only that entity's
+   sub-projects and their progress is recalculated from those. */
+const DEFAULT_ENTITIES=['MRE','TIFB','TIGB','SSB','MSSB','LRE'];
+S.entity=lsGet('dat-pm-entity','')||'';S.entities=null;
+const entityList=()=>(S.entities&&S.entities.length?S.entities:DEFAULT_ENTITIES);
+const subsAll=pid=>S.subs.filter(s=>s.projectId===pid).sort((a,b)=>(a.order??0)-(b.order??0)||(a.startDate||'').localeCompare(b.startDate||''));
+const inEntity=s=>!S.entity||(s.entity||'')===S.entity;
+const inScope=p=>!S.entity||subsAll(p.id).some(inEntity);
+const activeProjects=()=>S.projects.filter(p=>!p.archived&&inScope(p)).sort((a,b)=>(a.order??0)-(b.order??0)||(a.createdDate||'').localeCompare(b.createdDate||''));
 const archivedProjects=()=>S.projects.filter(p=>p.archived).sort((a,b)=>a.name.localeCompare(b.name));
-const subsOf=pid=>S.subs.filter(s=>s.projectId===pid).sort((a,b)=>(a.order??0)-(b.order??0)||(a.startDate||'').localeCompare(b.startDate||''));
+const subsOf=pid=>subsAll(pid).filter(inEntity);
 const issuesOf=pid=>S.issues.filter(i=>i.projectId===pid);
 const openIssuesOf=pid=>issuesOf(pid).filter(i=>i.status!=='Resolved');
 function progressOf(p){
@@ -823,7 +844,7 @@ function progressOf(p){
 function overdueDays(due,prog){return due&&TODAY>due&&prog<100?diffDays(due,TODAY):0}
 const projOverdue=p=>overdueDays(p.dueDate,progressOf(p));
 const subOverdue=s=>overdueDays(s.dueDate,Number(s.progress)||0);
-function lastUpdatedOf(p){return [p.lastUpdated,...subsOf(p.id).map(s=>s.lastUpdated),...issuesOf(p.id).map(i=>i.lastUpdated)].filter(Boolean).sort().slice(-1)[0]}
+function lastUpdatedOf(p){return [p.lastUpdated,...subsAll(p.id).map(s=>s.lastUpdated),...issuesOf(p.id).map(i=>i.lastUpdated)].filter(Boolean).sort().slice(-1)[0]}
 const allPics=()=>uniq([...(S.team||[]).map(p=>p.name),...S.projects.map(p=>p.pic),...S.subs.map(s=>s.pic),...S.issues.map(i=>i.pic)]);
 
 /* =========================================================
@@ -880,6 +901,7 @@ function renderTabs(){
     <nav class="side-nav">
       <button class="snav ${overview.includes(v)?'active':''}" data-nav="${overview[0]}">${NAVICON.sum}<span>Overview</span></button>
       ${area==='bau'?`<button class="snav ${v==='bauchk'?'active':''}" data-nav="bauchk">${NAVICON.chk}<span>Checklist</span></button>`:''}
+      ${area==='projects'&&S.entity?`<div class="side-ent">Filtered: <b>${esc(S.entity)}</b><button data-action="ent-clear" aria-label="Clear entity filter">${ICON.x}</button></div>`:''}
       <div class="side-sec"><span>${area==='projects'?'Projects':'BAU groups'} <em>${items.length}</em></span><button class="side-add" ${area==='projects'?'data-nav="add"':'data-action="bau-group-modal"'} title="${area==='projects'?'Add project':'Add BAU group'}" aria-label="${area==='projects'?'Add project':'Add BAU group'}">${ICON.plus}</button></div>
       ${items.length>6||q?`<input class="inp side-q" id="side-q" type="search" placeholder="Search ${area==='projects'?'projects':'groups'}" value="${esc(S.sideQ)}" aria-label="Search">`:''}
       <div class="side-list">${shown.map(i=>`<button class="sitem ${v===i.nav?'active':''}" data-nav="${i.nav}" title="${esc(i.name)}"><i style="background:${i.dot}"></i><span class="sn">${esc(i.name)}</span><span class="sm ${i.late?'late':''}">${esc(i.meta)}</span></button>`).join('')||`<p class="small" style="padding:6px 12px;margin:0">${q?'No matches.':area==='projects'?'No projects yet.':'No BAU groups yet.'}</p>`}
@@ -887,6 +909,7 @@ function renderTabs(){
     </nav>
     <div class="side-foot"><button class="sfoot" data-action="team-modal">Team directory</button>${S.mode!=='db'?`<button class="sfoot" data-action="backups">Backups</button>`:''}</div>`;
   const labels=area==='projects'?[['dashboard','Summary',NAVICON.sum],['pviz','Visualisation',NAVICON.viz],['gantt','Gantt chart',NAVICON.gantt]]:[['bau','Summary',NAVICON.sum],['bviz','Visualisation',NAVICON.viz],['bgantt','Gantt chart',NAVICON.gantt]];
+  const es=$('#entWrap');if(es){es.hidden=area!=='projects';if(area==='projects')es.innerHTML=`<label class="ent-sel ${S.entity?'on':''}"><span>Entity</span><select id="entSel" aria-label="Filter by entity"><option value="">All entities</option>${entityList().map(e=>`<option ${e===S.entity?'selected':''}>${esc(e)}</option>`).join('')}<option value="__manage">Edit entity list…</option></select></label>`}
   $('#tabs').innerHTML=labels.map(([k,l,ic])=>`<button class="ttab ${v===k?'active':''}" data-nav="${k}" ${v===k?'aria-current="page"':''}>${ic}<span>${l}</span></button>`).join('');
   const cur=area==='projects'?(v.startsWith('p:')?projById(v.slice(2))?.name:v==='add'?'New project':''):(v.startsWith('g:')?groupById(v.slice(2))?.name:v==='bauchk'?'Checklist':'');
   $('#tbTitle').innerHTML=`<span class="tb-area">${area==='projects'?'Projects':'BAU'}</span>${cur?`<span class="tb-cur">${esc(cur)}</span>`:''}`;
@@ -1446,6 +1469,12 @@ function remindText(){
     out.push(t)}
   return out.join('\n\n————————\n\n')||'No reminders right now.';
 }
+function entityModal(){
+  openModal({title:'Entity list',narrow:true,body:`<p class="small" style="margin:0">One entity per line. These appear in the Entity filter and on sub-projects. Tagging sub-projects is optional.</p><textarea class="inp" name="list" rows="8">${esc(entityList().join('\n'))}</textarea>`,
+    submit:'Save list',onSubmit:async f=>{const list=uniq(f.list.value.split('\n').map(x=>x.trim()).filter(Boolean));if(!list.length){toast('Add at least one entity.',true);return false}
+      S.entities=list;if(S.mode==='firebase'&&DB){try{await DB.collection('meta').doc('settings').set({entities:list,lastUpdated:TODAY},{merge:true})}catch(e){writeErr(e)}}else lsSet('dat-pm-entities',JSON.stringify(list));
+      if(S.entity&&!list.includes(S.entity)){S.entity='';lsSet('dat-pm-entity','')}refresh();toast('Entity list saved');return true}});
+}
 function teamModal(){
   const rows=(S.team.length?S.team:[{name:'',email:S.auth?.email||'',role:''}]).map(p=>({...p}));
   const pics=uniq([...allPics(),...S.bauTasks.flatMap(t=>[t.pic,t.reviewer,t.backupPic]),...S.bauGroups.map(g=>g.owner)]).filter(n=>!S.team.some(p=>normName(p.name)===normName(n)));
@@ -1487,7 +1516,7 @@ function renderProjectViz(){
   const schItems=[['On track','var(--s-ip)'],['Due within 7 days','var(--s-hold)'],['Overdue','var(--s-late)'],['Completed','var(--s-done)']].map(([l,col])=>({label:l,value:sch[l]||0,color:col}));
   const oi=S.issues.filter(i=>i.status!=='Resolved'&&!projById(i.projectId)?.archived);const pc=countBy(oi,i=>i.priority);
   const issueItems=PRIORITIES.slice().reverse().map(p=>({label:p,value:pc[p]||0,color:`var(--p-${PCLS[p]})`}));
-  const subs=S.subs.filter(s=>!projById(s.projectId)?.archived);const ss=countBy(subs,s=>s.status);
+  const subs=S.subs.filter(s=>!projById(s.projectId)?.archived&&inEntity(s));const ss=countBy(subs,s=>s.status);
   const subItems=CHART_ORDER.map(st=>({label:st,value:ss[st]||0,color:`var(--s-${SCLS[st]})`})).filter(i=>i.label!=='On Hold'||i.value);
   const byPic={};for(const s of subs){if(s.status==='Completed'||(Number(s.progress)||0)>=100)continue;const k=s.pic||'—';const o=byPic[k]||(byPic[k]={open:0,late:0});o.open++;if(subOverdue(s))o.late++}
   const picItems=Object.entries(byPic).sort((a,b)=>b[1].open-a[1].open).map(([k,o])=>({label:k,value:o.open,display:`${o.open}${o.late?` · ${o.late} late`:''}`,parts:[{label:'Overdue',value:o.late,color:'var(--s-late)'},{label:'On track',value:o.open-o.late,color:'var(--s-ip)'}]}));
@@ -1693,7 +1722,7 @@ function renderGantt(){
    PROJECT TAB
    ========================================================= */
 function renderProject(p){
-  const ss=subsOf(p.id);const prog=progressOf(p);const od=projOverdue(p);
+  const ss=subsOf(p.id);const prog=progressOf(p);const od=projOverdue(p);const entBanner=S.entity?`<div class="ent-banner">Showing <b>${esc(S.entity)}</b> sub-projects only (${ss.length} of ${subsAll(p.id).length}). Progress and counts below reflect ${esc(S.entity)}. <button class="linkbtn" data-action="ent-clear">Show all entities</button></div>`:'';
   const c=countBy(ss,s=>s.status);const iss=issuesOf(p.id).sort((a,b)=>(a.status==='Resolved')-(b.status==='Resolved')||PRIORITIES.indexOf(b.priority)-PRIORITIES.indexOf(a.priority));
   const days=p.dueDate?diffDays(TODAY,p.dueDate):null;
   const ch=getPC(p.id);const PP='p:'+p.id;const sq=ch.q.trim().toLowerCase();
@@ -1704,7 +1733,7 @@ function renderProject(p){
   const sFiltered=!!(ch.focus||ch.q||ch.pic||ch.deadline);
   const kpi=(l,v,sub,k,st,warn)=>`<${st?'button':'div'} class="kpi" style="--k:${k}" ${st?`data-action="p-focus" data-id="${p.id}" data-status="${st}" aria-pressed="${ch.focus===st}"`:''}><span class="l">${l}</span><span class="n">${v}</span>${sub?`<span class="pc ${warn?'w':''}">${sub}</span>`:''}</${st?'button':'div'}>`;
   const sum=p.summary||{};
-  return `
+  return `${entBanner}
   ${p.archived?`<div class="archived-banner"><span>This project is archived. It is hidden from the tabs, dashboard and Gantt.</span><button class="btn sm" data-action="archive" data-id="${p.id}">Restore project</button></div>`:''}
   <section class="phead">
     <div>
@@ -1721,8 +1750,8 @@ function renderProject(p){
       </dl>
       <div class="acts"><button class="btn primary" data-action="edit-project" data-id="${p.id}">${ICON.edit}Edit project</button><button class="btn" data-action="archive" data-id="${p.id}">${ICON.box}${p.archived?'Restore':'Archive'}</button><button class="btn danger" data-action="delete-project" data-id="${p.id}">${ICON.trash}Delete</button></div>
     </div>
-    <div class="bigprog"><span class="small">Overall progress</span><span class="n">${pctTxt(prog)}</span><div class="bar"><i style="width:${Math.min(prog,100)}%;background:var(--s-${SCLS[p.status]})"></i></div>
-      <span class="small">${p.progressMode==='manual'?'Entered manually':ss.length?`Average of ${plural(ss.length,'sub-project')}`:'Add sub-projects to calculate automatically'}</span></div>
+    <div class="bigprog"><span class="small">Overall progress${S.entity?` · ${esc(S.entity)}`:''}</span><span class="n">${pctTxt(prog)}</span><div class="bar"><i style="width:${Math.min(prog,100)}%;background:var(--s-${SCLS[p.status]})"></i></div>
+      <span class="small">${p.progressMode==='manual'?'Entered manually'+(S.entity?' (applies to all entities)':''):ss.length?`Average of ${plural(ss.length,(S.entity?S.entity+' ':'')+'sub-project')}`:S.entity?`No ${esc(S.entity)} sub-projects`:'Add sub-projects to calculate automatically'}</span></div>
   </section>
   <section class="kpis" aria-label="Sub-project figures">
     ${kpi('Overall completion',pctTxt(prog),'','var(--accent)')}
@@ -1752,7 +1781,7 @@ function renderProject(p){
     <div class="tw"><table class="t"><thead><tr>${sortTh('No.','no',ch,PP)}${sortTh('Sub-project / workstream','name',ch,PP)}${sortTh('Start date','start',ch,PP)}${sortTh('Expected completion','due',ch,PP)}${sortTh('Actual completion','actual',ch,PP)}${sortTh('Schedule','sched',ch,PP)}${sortTh('PIC','pic',ch,PP)}${sortTh('Progress','progress',ch,PP)}${sortTh('Status','status',ch,PP)}${sortTh('Issues / challenges','issues',ch,PP)}<th>Action</th></tr></thead><tbody>
     ${shownSubs.map(s=>{const sod=subOverdue(s);const oi=openIssuesOf(p.id).filter(i=>i.subProjectId===s.id).length;return `<tr>
       <td class="small">${ss.indexOf(s)+1}</td>
-      <td style="min-width:200px"><button class="pname" data-action="sub-view" data-id="${s.id}">${esc(s.name)}</button>${s.description?`<div class="small">${esc(s.description.length>80?s.description.slice(0,80)+'…':s.description)}</div>`:''}</td>
+      <td style="min-width:200px"><button class="pname" data-action="sub-view" data-id="${s.id}">${esc(s.name)}</button>${s.entity?` <span class="etag">${esc(s.entity)}</span>`:''}${s.description?`<div class="small">${esc(s.description.length>80?s.description.slice(0,80)+'…':s.description)}</div>`:''}</td>
       <td class="nowrap">${fmt(s.startDate)}</td><td class="nowrap">${fmt(s.dueDate)}</td><td class="nowrap">${fmt(s.actualCompletionDate)}</td><td>${schedHTML(subSched(s),false)}</td><td class="nowrap">${esc(s.pic||'—')}</td>
       <td style="min-width:190px"><div style="display:flex;gap:8px;align-items:center">${progBar(Number(s.progress)||0,s.status)}<input type="number" class="pin" min="0" max="100" step="5" value="${Number(s.progress)||0}" data-action="sub-prog" data-id="${s.id}" aria-label="Completion % for ${esc(s.name)}"></div></td>
       <td>${statusSelect(s.status,'sub-status',s.id)}</td>
@@ -1887,7 +1916,8 @@ function subModal({id,project}){
   const v=s||{name:'',description:'',startDate:'',dueDate:'',pic:'',status:'Not Started',progress:0,issues:'',resolution:'',remarks:''};
   openModal({title:s?'Edit sub-project':'Add sub-project',body:`
     <p class="small" style="margin:0">${esc(p.name)}</p>
-    <label class="f">Sub-project name *<input class="inp" name="name" data-req maxlength="120" value="${esc(v.name)}"></label>
+    <div class="g2" style="grid-template-columns:2fr 1fr"><label class="f">Sub-project name *<input class="inp" name="name" data-req maxlength="120" value="${esc(v.name)}"></label>
+    <label class="f">Entity <span class="hint">Optional</span><select class="inp" name="entity"><option value="">Not specified</option>${uniq([...entityList(),v.entity||''].filter(Boolean)).map(e=>`<option ${e===(v.entity||(!s&&S.entity)||'')?'selected':''}>${esc(e)}</option>`).join('')}</select></label></div>
     <label class="f">Description<textarea class="inp" name="description" rows="2">${esc(v.description)}</textarea></label>
     <div class="g3"><label class="f">Start date<input type="date" class="inp" name="startDate" value="${v.startDate}"></label><label class="f">Expected completion (due date)<input type="date" class="inp" name="dueDate" value="${v.dueDate}"></label><label class="f">PIC *<input class="inp" name="pic" data-req list="picl2" value="${esc(v.pic)}"><datalist id="picl2">${allPics().map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label></div>
     <div class="g3"><label class="f">Status<select class="inp" name="status" onchange="const a=this.form.actualCompletionDate;if(this.value==='Completed'){this.form.progress.value=100;this.form.progress.nextElementSibling.value='100%';if(!a.value)a.value='${TODAY}'}else a.value=''">${opts(STATUSES,v.status)}</select></label>
@@ -1900,7 +1930,7 @@ function subModal({id,project}){
       if(!ok)return false;if(g('startDate')&&g('dueDate')&&g('dueDate')<g('startDate')){mark(f.dueDate,'Due date must be on or after the start date');return false}
       const q=s?clone(s):{id:uid('s'),projectId:pid,order:Date.now()};let st=g('status'),pr=Number(fd.get('progress'));
       if(st==='Completed')pr=100;else if(pr===100&&st!=='On Hold')st='Completed';else if(pr>0&&st==='Not Started')st='In Progress';
-      Object.assign(q,{name:g('name'),description:g('description'),startDate:g('startDate'),dueDate:g('dueDate'),actualCompletionDate:st==='Completed'?(g('actualCompletionDate')||TODAY):'',pic:g('pic'),status:st,progress:pr,issues:g('issues'),resolution:g('resolution'),remarks:g('remarks')});
+      Object.assign(q,{name:g('name'),entity:g('entity'),description:g('description'),startDate:g('startDate'),dueDate:g('dueDate'),actualCompletionDate:st==='Completed'?(g('actualCompletionDate')||TODAY):'',pic:g('pic'),status:st,progress:pr,issues:g('issues'),resolution:g('resolution'),remarks:g('remarks')});
       await Store.save('subs',q);toast(s?'Sub-project saved':'Sub-project added');return true}});
 }
 function subView(id){
@@ -1921,7 +1951,7 @@ function issueModal({id,project,sub}){
   openModal({title:i?'Edit issue':'Add issue',body:`
     <p class="small" style="margin:0">${esc(p.name)}</p>
     <label class="f">Issue / challenge *<textarea class="inp" name="description" rows="2" data-req>${esc(v.description)}</textarea></label>
-    <div class="g2"><label class="f">Related sub-project<select class="inp" name="subProjectId"><option value="">Whole project</option>${subsOf(pid).map(s=>`<option value="${s.id}" ${s.id===v.subProjectId?'selected':''}>${esc(s.name)}</option>`).join('')}</select></label>
+    <div class="g2"><label class="f">Related sub-project<select class="inp" name="subProjectId"><option value="">Whole project</option>${subsAll(pid).map(s=>`<option value="${s.id}" ${s.id===v.subProjectId?'selected':''}>${esc(s.name)}</option>`).join('')}</select></label>
     <label class="f">PIC *<input class="inp" name="pic" data-req list="picl3" value="${esc(v.pic)}"><datalist id="picl3">${allPics().map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label>
     <label class="f">Date raised *<input type="date" class="inp" name="dateRaised" data-req value="${v.dateRaised}"></label>
     <label class="f">Priority<select class="inp" name="priority">${opts(PRIORITIES,v.priority)}</select></label>
@@ -1989,6 +2019,7 @@ document.addEventListener('click',async e=>{
   switch(a){
     case 'close-modal':closeModal();break;
     case 'remind-open':openRemind();break;
+    case 'ent-clear':S.entity='';lsSet('dat-pm-entity','');refresh();break;
     case 'viz-pstatus':S.dash.focus=t.dataset.status;go('dashboard');break;
     case 'viz-bstatus':S.bauD.focus=t.dataset.status;go('bau');break;
     case 'bg-preset':S.bgantt.preset=t.dataset.k;renderMain();break;
@@ -2045,9 +2076,9 @@ document.addEventListener('click',async e=>{
     case 'tclear':{const st=stateFor(t.dataset.path);Object.assign(st,{focus:'',q:'',pic:'',deadline:'',sort:'',dir:'asc'});renderMain();break}
     case 'edit-project':editProjectModal(projById(id));break;
     case 'archive':{const p=clone(projById(id));p.archived=!p.archived;await Store.save('projects',p).catch(()=>{});toast(p.archived?'Project archived. Find it under More.':'Project restored');break}
-    case 'delete-project':{const p=projById(id);const ns=subsOf(id).length,ni=issuesOf(id).length;
+    case 'delete-project':{const p=projById(id);const ns=subsAll(id).length,ni=issuesOf(id).length;
       confirmBox('Delete project?',`<b>${esc(p.name)}</b> and its tab will be removed${ns||ni?`, together with ${[ns?plural(ns,'sub-project'):'',ni?plural(ni,'issue'):''].filter(Boolean).join(' and ')}`:''}. This can’t be undone. To keep the record, archive it instead.`,'Delete project',async()=>{
-        try{for(const i of issuesOf(id))await Store.remove('issues',i.id);for(const s of subsOf(id))await Store.remove('subs',s.id);await Store.remove('projects',id);toast('Project deleted');go('dashboard')}catch(err){}});break}
+        try{for(const i of issuesOf(id))await Store.remove('issues',i.id);for(const s of subsAll(id))await Store.remove('subs',s.id);await Store.remove('projects',id);toast('Project deleted');go('dashboard')}catch(err){}});break}
     case 'sub-modal':subModal({id,project:t.dataset.project});break;
     case 'sub-view':subView(id);break;
     case 'sub-delete':{const s=subById(id);const n=S.issues.filter(i=>i.subProjectId===id).length;
@@ -2072,6 +2103,7 @@ document.addEventListener('change',async e=>{
   if(a==='issue-status'){const i=issueById(t.dataset.id);if(t.value==='Resolved'&&!i.resolution){t.value=i.status;issueModal({id:i.id});setTimeout(()=>{const f=$('#mform');if(f){f.status.value='Resolved';f.actualDate.value=f.actualDate.value||TODAY;f.resolution.focus()}},40);return}
     const q=clone(i);q.status=t.value;if(t.value==='Resolved')q.actualDate=q.actualDate||TODAY;else q.actualDate='';await Store.save('issues',q).then(()=>toast('Issue updated')).catch(()=>{});return}
   if(a==='bau-done'||a==='bau-status'){const bt=bauTaskById(t.dataset.t);if(!bt)return;const status=a==='bau-done'?(t.checked?(bt.reviewer?'Pending Review':'Completed'):'Not Started'):t.value;if(blockIfOpen(bt,status)){if(a==='bau-done')t.checked=false;else t.value=bt.status||'Not Started';return}await saveTaskPatch(bt,{status}).then(()=>toast(status==='Completed'?'Marked completed':status==='Pending Review'?'Sent for review':'Status updated')).catch(()=>{});return}
+  if(t.id==='entSel'){if(t.value==='__manage'){t.value=S.entity;entityModal();return}S.entity=t.value;lsSet('dat-pm-entity',S.entity);refresh();toast(S.entity?`Showing ${S.entity} only`:'Showing all entities');return}
   if(t.id==='rp-who'){S.remind.who=t.value;renderRemindPanel();return}
   if(a==='msub-exp'){const x=window.__msubs?.[+t.dataset.i];if(x)x.expectedDate=t.value;renderModalSubs();return}
   if(a==='msub-donedate'){const x=window.__msubs?.[+t.dataset.i];if(x){x.doneDate=t.value;x.done=!!t.value}renderModalSubs();return}
