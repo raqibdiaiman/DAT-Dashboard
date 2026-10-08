@@ -250,8 +250,17 @@ select.ssel{appearance:none;-webkit-appearance:none;border:1px solid color-mix(i
 .hbar .v{font-weight:600}.hbar .v small{color:var(--faint);font-weight:500;margin-left:4px}
 
 /* gantt */
-.gantt{min-width:720px}
-.g-head,.g-row{display:grid;grid-template-columns:260px 1fr;align-items:center}
+.gantt{--gname-w:300px;min-width:calc(var(--gname-w) + 620px)}
+.g-head,.g-row{display:grid;grid-template-columns:var(--gname-w) 1fr;align-items:center}
+.g-head .g-label{position:relative;height:100%;display:flex;align-items:center;border-right:1px solid var(--line)}
+.g-name{border-right:1px solid var(--line);align-self:stretch;display:flex;flex-direction:column;justify-content:center}
+.g-resize{position:absolute;top:0;right:-6px;width:12px;height:100%;cursor:col-resize;z-index:5;display:flex;justify-content:center;touch-action:none}
+.g-resize::after{content:"";width:3px;height:60%;align-self:center;border-radius:2px;background:var(--line);transition:background .15s}
+.g-resize:hover::after,.gantt.resizing .g-resize::after{background:var(--accent)}
+.gantt.resizing{cursor:col-resize;user-select:none}
+.gantt.wrap .g-name b{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.3}
+.gw-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 24px;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.gw-tools input[type=range]{width:160px;accent-color:var(--accent)}
 .g-head{border-bottom:1px solid var(--line);height:34px;background:var(--surface-2)}
 .g-head .g-label{padding-left:18px;font-size:12.5px;font-weight:600;color:var(--muted)}
 .g-scale{position:relative;height:100%}
@@ -1598,14 +1607,28 @@ function renderBauGantt(){
     <label class="f">Status<select class="inp" id="bgs" data-bind="bgantt.status">${opts([...BAU_STATUSES,'Overdue'],G.status,'All statuses')}</select></label>
   </section>
   <section class="panel flush">
-    ${body?`<div class="tw"><div class="gantt">
-      <div class="g-head"><div class="g-label">Task · ${fmt(from)} – ${fmt(to)}</div><div class="g-scale">${ticks.map(([d,l])=>`<span style="left:${pos(d)}%">${l}</span>`).join('')}</div></div>
+    ${body?`${ganttTools()}<div class="tw"><div class="gantt ${ganttWrap()?'wrap':''}" style="--gname-w:${ganttW()}px">
+      <div class="g-head"><div class="g-label"><span class="g-resize" data-gresize title="Drag to resize the name column (double-click to reset)" role="separator" aria-orientation="vertical" aria-label="Resize name column" tabindex="0"></span>Task · ${fmt(from)} – ${fmt(to)}</div><div class="g-scale">${ticks.map(([d,l])=>`<span style="left:${pos(d)}%">${l}</span>`).join('')}</div></div>
       ${body}</div></div>
       <div class="g-legend"><span><i style="--c:var(--s-done)"></i>Done on time</span><span><i style="--c:var(--s-hold)"></i>Done late / pending review</span><span><i style="--c:var(--s-ip)"></i>In progress</span><span><i style="--c:var(--s-ns)"></i>Not started</span><span><i style="--c:var(--s-late)"></i>Overdue</span>${showToday?`<span><i style="--c:var(--s-late);width:2px;border-radius:0"></i>Today</span>`:''}</div>`
     :emptyState('No BAU tasks in this range','Try a wider range or clear a filter.')}
   </section>`;
 }
 
+/* Gantt name column width: drag the divider, use the slider, or double-click to reset. Remembered per device. */
+const GW_DEF=300,GW_MIN=180,GW_MAX=720;
+const ganttW=()=>{const v=Number(lsGet('dat-pm-gantt-w',''));return v>=GW_MIN&&v<=GW_MAX?v:GW_DEF};
+const ganttWrap=()=>lsGet('dat-pm-gantt-wrap','')==='1';
+function setGanttW(v,save=true){v=Math.round(Math.min(GW_MAX,Math.max(GW_MIN,v)));document.querySelectorAll('.gantt').forEach(g=>g.style.setProperty('--gname-w',v+'px'));const r=$('#gw-range');if(r)r.value=v;const o=$('#gw-out');if(o)o.textContent=v+'px';if(save)lsSet('dat-pm-gantt-w',String(v))}
+function ganttTools(){return `<div class="gw-tools"><span>Name column</span><input type="range" id="gw-range" min="${GW_MIN}" max="${GW_MAX}" step="10" value="${ganttW()}" aria-label="Name column width"><output id="gw-out">${ganttW()}px</output><button class="btn sm" data-action="gw-fit">Fit longest name</button><button class="btn sm ghost" data-action="gw-reset">Reset</button><label style="display:flex;gap:6px;align-items:center;margin-left:auto"><input type="checkbox" class="check" data-action="gw-wrap" ${ganttWrap()?'checked':''}> Wrap long names</label></div>`}
+let gDrag=null;
+document.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-gresize]');if(!h)return;e.preventDefault();const g=h.closest('.gantt');gDrag={x:e.clientX,w:ganttW(),g};g.classList.add('resizing');h.setPointerCapture?.(e.pointerId)});
+document.addEventListener('pointermove',e=>{if(!gDrag)return;setGanttW(gDrag.w+(e.clientX-gDrag.x),false)});
+document.addEventListener('pointerup',e=>{if(!gDrag)return;gDrag.g.classList.remove('resizing');const v=parseInt(getComputedStyle(gDrag.g).getPropertyValue('--gname-w'))||ganttW();gDrag=null;setGanttW(v)});
+document.addEventListener('dblclick',e=>{if(e.target.closest('[data-gresize]'))setGanttW(GW_DEF)});
+document.addEventListener('keydown',e=>{if(!e.target.matches?.('[data-gresize]'))return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setGanttW(ganttW()+(e.key==='ArrowRight'?20:-20))}});
+document.addEventListener('input',e=>{if(e.target.id==='gw-range')setGanttW(Number(e.target.value))});
+function fitGanttNames(){const bs=[...document.querySelectorAll('.gantt .g-name b')];if(!bs.length)return;const c=document.createElement('canvas').getContext('2d');const cs=getComputedStyle(bs[0]);c.font=`${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;const w=Math.max(...bs.map(b=>c.measureText(b.textContent).width));setGanttW(w+60)}
 function renderDashboard(){
   const ps=activeProjects();const rows=ps.map(p=>({p,prog:progressOf(p),od:projOverdue(p)}));
   const n=rows.length;const c=countBy(rows,r=>r.p.status);
@@ -1704,8 +1727,8 @@ function renderGantt(){
   </section>
   <section class="panel flush">
     ${!ps.length?emptyState('No projects to chart','Projects need a start and due date to appear on the Gantt.'):!rows.length?emptyState('No projects in this range','Widen the dates or clear a filter.',`<button class="btn" data-action="g-reset">Clear filters</button>`):`
-    <div class="tw"><div class="gantt">
-      <div class="g-head"><div class="g-label">Project · ${fmt(from)} – ${fmt(to)}</div><div class="g-scale">${ticks.map(([d,l])=>`<span style="left:${pos(d)}%">${l}</span>`).join('')}</div></div>
+    ${ganttTools()}<div class="tw"><div class="gantt ${ganttWrap()?'wrap':''}" style="--gname-w:${ganttW()}px">
+      <div class="g-head"><div class="g-label"><span class="g-resize" data-gresize title="Drag to resize the name column (double-click to reset)" role="separator" aria-orientation="vertical" aria-label="Resize name column" tabindex="0"></span>Project · ${fmt(from)} – ${fmt(to)}</div><div class="g-scale">${ticks.map(([d,l])=>`<span style="left:${pos(d)}%">${l}</span>`).join('')}</div></div>
       ${rows.map(p=>{const pr=progressOf(p),od=projOverdue(p);const l=pos(p.startDate),r=pos(p.dueDate);const w=Math.max(r-l,0.8);
         return `<div class="g-row" data-nav="p:${p.id}" role="link" tabindex="0" aria-label="${esc(p.name)}, ${fmt(p.startDate)} to ${fmt(p.dueDate)}, ${Math.round(pr)}% complete, ${esc(p.status)}">
           <div class="g-name"><b title="${esc(p.name)}">${esc(p.name)}</b><div class="small" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${badge(p.status)}<span>${Math.round(pr)}%</span>${od?`<span class="warn" title="System deadline warning">${ICON.warn}${od}d</span>`:''}</div></div>
@@ -2019,6 +2042,8 @@ document.addEventListener('click',async e=>{
   switch(a){
     case 'close-modal':closeModal();break;
     case 'remind-open':openRemind();break;
+    case 'gw-fit':fitGanttNames();break;
+    case 'gw-reset':setGanttW(GW_DEF);break;
     case 'ent-clear':S.entity='';lsSet('dat-pm-entity','');refresh();break;
     case 'viz-pstatus':S.dash.focus=t.dataset.status;go('dashboard');break;
     case 'viz-bstatus':S.bauD.focus=t.dataset.status;go('bau');break;
@@ -2104,6 +2129,7 @@ document.addEventListener('change',async e=>{
     const q=clone(i);q.status=t.value;if(t.value==='Resolved')q.actualDate=q.actualDate||TODAY;else q.actualDate='';await Store.save('issues',q).then(()=>toast('Issue updated')).catch(()=>{});return}
   if(a==='bau-done'||a==='bau-status'){const bt=bauTaskById(t.dataset.t);if(!bt)return;const status=a==='bau-done'?(t.checked?(bt.reviewer?'Pending Review':'Completed'):'Not Started'):t.value;if(blockIfOpen(bt,status)){if(a==='bau-done')t.checked=false;else t.value=bt.status||'Not Started';return}await saveTaskPatch(bt,{status}).then(()=>toast(status==='Completed'?'Marked completed':status==='Pending Review'?'Sent for review':'Status updated')).catch(()=>{});return}
   if(t.id==='entSel'){if(t.value==='__manage'){t.value=S.entity;entityModal();return}S.entity=t.value;lsSet('dat-pm-entity',S.entity);refresh();toast(S.entity?`Showing ${S.entity} only`:'Showing all entities');return}
+  if(a==='gw-wrap'){lsSet('dat-pm-gantt-wrap',t.checked?'1':'');document.querySelectorAll('.gantt').forEach(g=>g.classList.toggle('wrap',t.checked));return}
   if(t.id==='rp-who'){S.remind.who=t.value;renderRemindPanel();return}
   if(a==='msub-exp'){const x=window.__msubs?.[+t.dataset.i];if(x)x.expectedDate=t.value;renderModalSubs();return}
   if(a==='msub-donedate'){const x=window.__msubs?.[+t.dataset.i];if(x){x.doneDate=t.value;x.done=!!t.value}renderModalSubs();return}
