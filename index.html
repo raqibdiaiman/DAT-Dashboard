@@ -281,8 +281,9 @@ select.ssel{appearance:none;-webkit-appearance:none;border:1px solid color-mix(i
 .g-today span{position:absolute;top:2px;left:4px;font-size:11px;font-weight:700;color:var(--s-late);white-space:nowrap}
 .g-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted);padding:12px 18px;border-top:1px solid var(--line)}
 .g-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:6px}
-.gantt.has-rem{--grem-w:250px;min-width:calc(var(--gname-w) + var(--grem-w) + 440px)}
-.gantt.has-rem .g-head,.gantt.has-rem .g-row{grid-template-columns:var(--gname-w) 1fr var(--grem-w)}
+.gantt.has-x .g-head,.gantt.has-x .g-row{grid-template-columns:var(--gcols)}
+.g-ben textarea{color:#1F5A38}
+.g-rem textarea{field-sizing:content;max-height:132px;overflow:auto}
 .g-head .g-remh{height:100%;display:flex;align-items:center;padding:0 14px;border-left:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--muted)}
 .g-rem{align-self:stretch;border-left:1px solid var(--line);padding:6px 8px;display:flex;cursor:default}
 .g-rem textarea{flex:1;width:100%;min-height:42px;resize:none;border:1px solid transparent;border-radius:6px;background:transparent;font:inherit;font-size:12.5px;line-height:1.35;color:var(--ink);padding:4px 6px}
@@ -1635,7 +1636,7 @@ const GW_DEF=300,GW_MIN=180,GW_MAX=720;
 const ganttW=()=>{const v=Number(lsGet('dat-pm-gantt-w',''));return v>=GW_MIN&&v<=GW_MAX?v:GW_DEF};
 const ganttWrap=()=>lsGet('dat-pm-gantt-wrap','')==='1';
 function setGanttW(v,save=true){v=Math.round(Math.min(GW_MAX,Math.max(GW_MIN,v)));document.querySelectorAll('.gantt').forEach(g=>g.style.setProperty('--gname-w',v+'px'));const r=$('#gw-range');if(r)r.value=v;const o=$('#gw-out');if(o)o.textContent=v+'px';if(save)lsSet('dat-pm-gantt-w',String(v))}
-function ganttTools(withRem){return `<div class="gw-tools"><span>Name column</span><input type="range" id="gw-range" min="${GW_MIN}" max="${GW_MAX}" step="10" value="${ganttW()}" aria-label="Name column width"><output id="gw-out">${ganttW()}px</output><button class="btn sm" data-action="gw-fit">Fit longest name</button><button class="btn sm ghost" data-action="gw-reset">Reset</button><label style="display:flex;gap:6px;align-items:center;margin-left:auto"><input type="checkbox" class="check" data-action="gw-wrap" ${ganttWrap()?'checked':''}> Wrap long names</label>${withRem?`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="check" data-action="g-rem" ${ganttRem()?'checked':''}> Show remarks</label>`:''}</div>`}
+function ganttTools(withRem){return `<div class="gw-tools"><span>Name column</span><input type="range" id="gw-range" min="${GW_MIN}" max="${GW_MAX}" step="10" value="${ganttW()}" aria-label="Name column width"><output id="gw-out">${ganttW()}px</output><button class="btn sm" data-action="gw-fit">Fit longest name</button><button class="btn sm ghost" data-action="gw-reset">Reset</button><label style="display:flex;gap:6px;align-items:center;margin-left:auto"><input type="checkbox" class="check" data-action="gw-wrap" ${ganttWrap()?'checked':''}> Wrap long names</label>${withRem?`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="check" data-action="g-rem" ${ganttRem()?'checked':''}> Show remarks</label><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="check" data-action="g-ben" ${ganttBen()?'checked':''}> Show benefits</label>`:''}</div>`}
 let gDrag=null;
 document.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-gresize]');if(!h)return;e.preventDefault();const g=h.closest('.gantt');gDrag={x:e.clientX,w:ganttW(),g};g.classList.add('resizing');h.setPointerCapture?.(e.pointerId)});
 document.addEventListener('pointermove',e=>{if(!gDrag)return;setGanttW(gDrag.w+(e.clientX-gDrag.x),false)});
@@ -1717,6 +1718,8 @@ function ganttRange(k){
   return ['',''];
 }
 const ganttRem=()=>lsGet('dat-pm-grem')!=='0';
+const ganttBen=()=>lsGet('dat-pm-gben')!=='0';
+const GX_COLW=250;
 function ganttModel(exp){
   const g=S.gantt;const ps=activeProjects().filter(p=>p.startDate&&p.dueDate);
   let from=g.from,to=g.to;
@@ -1728,11 +1731,11 @@ function ganttModel(exp){
   // scale: months (or weeks when window is short)
   const ticks=[];const weekly=span<=62;
   if(weekly){let d=parse(from);d.setDate(d.getDate()-((d.getDay()+6)%7));while(iso(d)<=to){if(iso(d)>=from)ticks.push([iso(d),`${d.getDate()} ${MONTHS[d.getMonth()]}`]);d.setDate(d.getDate()+7)}}
-  else{let d=parse(from);d=new Date(d.getFullYear(),d.getMonth(),1);const step=span>540?3:(!exp&&ganttRem()&&span>400)?2:1;while(iso(d)<=to){if(iso(d)>=from||!ticks.length)ticks.push([iso(d)<from?from:iso(d),`${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`]);d=new Date(d.getFullYear(),d.getMonth()+step,1)}}
+  else{let d=parse(from);d=new Date(d.getFullYear(),d.getMonth(),1);const step=span>540?3:(!exp&&(ganttRem()||ganttBen())&&span>400)?2:1;while(iso(d)<=to){if(iso(d)>=from||!ticks.length)ticks.push([iso(d)<from?from:iso(d),`${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`]);d=new Date(d.getFullYear(),d.getMonth()+step,1)}}
   return {g,ps,from,to,span,pos,rows,ticks,weekly,showToday:TODAY>=from&&TODAY<=to};
 }
 function renderGantt(){
-  const {g,ps,from,to,pos,rows,ticks,showToday}=ganttModel();const rem=ganttRem();
+  const {g,ps,from,to,pos,rows,ticks,showToday}=ganttModel();const rem=ganttRem(),ben=ganttBen(),nx=(rem?1:0)+(ben?1:0);
   const presets=[['month','This month'],['quarter','This quarter'],['year','This year'],['all','All']];
   return `
   <header class="page-h"><div><h1>Overall Gantt</h1><p class="sub">Main DAT projects only. Bars run from start to due date, and the filled part shows completion. Select a project to open its tab.</p></div>
@@ -1740,6 +1743,7 @@ function renderGantt(){
       <button role="menuitem" data-action="g-export" data-k="xlsx">Excel (.xlsx)<small>Coloured Gantt grid, editable data</small></button>
       <button role="menuitem" data-action="g-export" data-k="pdf">PDF<small>Landscape A4, ready to print or email</small></button>
       <button role="menuitem" data-action="g-export" data-k="pptx">PowerPoint (.pptx)<small>Editable slides for meetings</small></button>
+      <button role="menuitem" data-action="g-import" style="border-top:1px solid var(--line);border-radius:0 0 7px 7px;margin-top:4px">Update from Excel…<small>Load remarks and benefits from the Data sheet</small></button>
     </div></details>`:''}</header>
   <section class="filterbar" aria-label="Gantt filters">
     <div class="chips" role="group" aria-label="Quick range">${presets.map(([k,l])=>`<button class="chip" data-action="g-preset" data-k="${k}" aria-pressed="${g.preset===k}">${l}</button>`).join('')}</div>
@@ -1751,15 +1755,15 @@ function renderGantt(){
   </section>
   <section class="panel flush">
     ${!ps.length?emptyState('No projects to chart','Projects need a start and due date to appear on the Gantt.'):!rows.length?emptyState('No projects in this range','Widen the dates or clear a filter.',`<button class="btn" data-action="g-reset">Clear filters</button>`):`
-    ${ganttTools(true)}<div class="tw"><div class="gantt ${ganttWrap()?'wrap':''} ${rem?'has-rem':''}" style="--gname-w:${ganttW()}px">
-      <div class="g-head"><div class="g-label"><span class="g-resize" data-gresize title="Drag to resize the name column (double-click to reset)" role="separator" aria-orientation="vertical" aria-label="Resize name column" tabindex="0"></span>Project · ${fmt(from)} – ${fmt(to)}</div><div class="g-scale">${ticks.map(([d,l])=>`<span style="left:${pos(d)}%">${l}</span>`).join('')}</div>${rem?`<div class="g-remh">Remarks / pain points</div>`:''}</div>
+    ${ganttTools(true)}<div class="tw"><div class="gantt ${ganttWrap()?'wrap':''} ${nx?'has-x':''}" style="--gname-w:${ganttW()}px;${nx?`--gcols:var(--gname-w) 1fr${' '+GX_COLW+'px'}${nx>1?' '+GX_COLW+'px':''};min-width:calc(${ganttW()}px + ${440+GX_COLW*nx}px)`:''}">
+      <div class="g-head"><div class="g-label"><span class="g-resize" data-gresize title="Drag to resize the name column (double-click to reset)" role="separator" aria-orientation="vertical" aria-label="Resize name column" tabindex="0"></span>Project · ${fmt(from)} – ${fmt(to)}</div><div class="g-scale">${ticks.map(([d,l])=>`<span style="left:${pos(d)}%">${l}</span>`).join('')}</div>${rem?`<div class="g-remh">Remarks / pain points</div>`:''}${ben?`<div class="g-remh">Benefits</div>`:''}</div>
       ${rows.map(p=>{const pr=progressOf(p),od=projOverdue(p);const l=pos(p.startDate),r=pos(p.dueDate);const w=Math.max(r-l,0.8);
         return `<div class="g-row" data-nav="p:${p.id}" role="link" tabindex="0" aria-label="${esc(p.name)}, ${fmt(p.startDate)} to ${fmt(p.dueDate)}, ${Math.round(pr)}% complete, ${esc(p.status)}">
           <div class="g-name"><b title="${esc(p.name)}">${esc(p.name)}</b><div class="small" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${badge(p.status)}<span>${Math.round(pr)}%</span>${od?`<span class="warn" title="System deadline warning">${ICON.warn}${od}d</span>`:''}</div></div>
           <div class="g-track">${ticks.map(([d])=>`<span class="g-grid" style="left:${pos(d)}%"></span>`).join('')}
             <div class="g-bar ${p.startDate<from?'cut-l':''} ${p.dueDate>to?'cut-r':''}" style="left:${l}%;width:${w}%;--c:var(--s-${SCLS[p.status]})" title="${esc(p.name)}: ${fmt(p.startDate)} – ${fmt(p.dueDate)} · ${Math.round(pr)}% · ${esc(p.status)}"><i style="width:${Math.min(pr,100)}%"></i>${w>6?`<em ${pr<12?'style="color:var(--ink);text-shadow:none"':''}>${Math.round(pr)}%</em>`:''}</div>
             ${showToday?`<span class="g-today" style="left:${pos(TODAY)}%"></span>`:''}
-          </div>${rem?`<div class="g-rem"><textarea id="grem-${p.id}" data-grem="${p.id}" rows="2" maxlength="600" placeholder="Add remark or pain point" aria-label="Remarks for ${esc(p.name)}" title="Saved to the project's Remarks. Also editable in Edit project.">${esc(p.remarks||'')}</textarea></div>`:''}</div>`}).join('')}
+          </div>${rem?`<div class="g-rem"><textarea id="grem-${p.id}" data-grem="${p.id}" rows="2" maxlength="600" placeholder="Add remark or pain point" aria-label="Remarks for ${esc(p.name)}" title="Saved to the project's Remarks. Also editable in Edit project.">${esc(p.remarks||'')}</textarea></div>`:''}${ben?`<div class="g-rem g-ben"><textarea id="gben-${p.id}" data-gben="${p.id}" rows="2" maxlength="600" placeholder="Add benefit to the business" aria-label="Benefits for ${esc(p.name)}" title="Saved to the project's Expected benefit. Also editable in Edit project.">${esc(p.benefit||'')}</textarea></div>`:''}</div>`}).join('')}
     </div></div>
     <div class="g-legend">${CHART_ORDER.map(s=>`<span><i style="--c:var(--s-${SCLS[s]})"></i>${s}</span>`).join('')}${showToday?`<span><i style="--c:var(--s-late);width:2px;border-radius:0"></i>Today, ${fmt(TODAY)}</span>`:''}</div>`}
   </section>`;
@@ -1780,8 +1784,9 @@ function gxData(){
   const rows=M.rows.map(p=>{const pr=Math.round(progressOf(p)),od=projOverdue(p);
     return {name:p.name,status:p.status,pic:p.pic||'',start:p.startDate,due:p.dueDate,pr,od,
       sched:p.status==='Completed'?'Completed':od?`Overdue ${od}d`:`${Math.max(0,diffDays(TODAY,p.dueDate))}d left`,
-      remarks:(p.remarks||'').trim(),hex:GX_HEX[p.status]||GX_HEX['Not Started']}});
-  return {...M,rows,filt,stamp:`${fmt(M.from)} – ${fmt(M.to)}${filt?' · '+filt:''} · as at ${fmt(TODAY)}`,
+      remarks:(p.remarks||'').trim(),benefit:(p.benefit||'').trim(),hex:GX_HEX[p.status]||GX_HEX['Not Started']}});
+  const xcols=[ganttRem()&&{k:'remarks',l:'Remarks / pain points',hex:'172234'},ganttBen()&&{k:'benefit',l:'Benefits',hex:'1F5A38'}].filter(Boolean);
+  return {...M,rows,filt,xcols,stamp:`${fmt(M.from)} – ${fmt(M.to)}${filt?' · '+filt:''} · as at ${fmt(TODAY)}`,
     file:`DAT_Gantt_${TODAY}`};
 }
 function gxSave(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500)}
@@ -1798,13 +1803,13 @@ async function gxExcel(d){
   // periods = one column per tick (month, quarter step or week)
   const per=d.ticks.map(([s],i)=>{const e=i+1<d.ticks.length?iso(new Date(parse(d.ticks[i+1][0]).getTime()-864e5)):d.to;return {s,e,l:d.ticks[i][1]}});
   const fixed=['Project','Status','PIC','Start','Due','Progress','Schedule'];
-  const nCols=fixed.length+per.length+1;const remCol=nCols;
+  const nCols=fixed.length+per.length+d.xcols.length;const xc0=fixed.length+per.length+1;
   const navy='FF14223D',line='FFE1E6ED',muted='FF5A6678';
   ws.getCell(1,1).value='DAT Overall Gantt';ws.getCell(1,1).font={name:'Calibri',size:16,bold:true,color:{argb:navy}};
   ws.getCell(2,1).value=d.stamp;ws.getCell(2,1).font={name:'Calibri',size:10,color:{argb:muted}};
-  const hr=ws.getRow(4);[...fixed,...per.map(p=>p.l),'Remarks / pain points'].forEach((v,i)=>{const c=hr.getCell(i+1);c.value=v;
+  const hr=ws.getRow(4);[...fixed,...per.map(p=>p.l),...d.xcols.map(x=>x.l)].forEach((v,i)=>{const c=hr.getCell(i+1);c.value=v;
     c.font={name:'Calibri',size:10,bold:true,color:{argb:'FFFFFFFF'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:navy}};
-    c.alignment={vertical:'middle',horizontal:i<fixed.length||i===nCols-1?'left':'center',wrapText:true}});
+    c.alignment={vertical:'middle',horizontal:i<fixed.length||i>=xc0-1?'left':'center',wrapText:true}});
   hr.height=24;
   const todayIdx=per.findIndex(p=>TODAY>=p.s&&TODAY<=p.e);
   d.rows.forEach((r,ri)=>{const row=ws.getRow(5+ri);const span=Math.max(diffDays(r.start,r.due),1);
@@ -1819,25 +1824,47 @@ async function gxExcel(d){
         c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+(done||part?r.hex:gxTint(r.hex))}};
         if(!labelled){c.value=r.pr+'%';c.font={name:'Calibri',size:9,bold:true,color:{argb:done||part?'FFFFFFFF':'FF172234'}};c.alignment={horizontal:'left',vertical:'middle'};labelled=true}}
       c.border={left:{style:pi===todayIdx?'medium':'hair',color:{argb:pi===todayIdx?'FFC0392B':line}},bottom:{style:'thin',color:{argb:line}}}});
-    const rc=row.getCell(remCol);rc.value=r.remarks;rc.font={name:'Calibri',size:10,color:{argb:'FF172234'}};rc.alignment={wrapText:true,vertical:'middle'};
+    d.xcols.forEach((x,xi)=>{const rc=row.getCell(xc0+xi);rc.value=r[x.k];rc.font={name:'Calibri',size:10,color:{argb:'FF'+x.hex}};rc.alignment={wrapText:true,vertical:'middle'};
+      rc.border={left:{style:'thin',color:{argb:line}},bottom:{style:'thin',color:{argb:line}}}});
     for(let i=1;i<=fixed.length;i++)row.getCell(i).border={bottom:{style:'thin',color:{argb:line}}};
-    rc.border={left:{style:'thin',color:{argb:line}},bottom:{style:'thin',color:{argb:line}}};
-    row.height=Math.max(30,15*Math.ceil(Math.max(r.remarks.length/55,r.name.length/34,1)));
+    row.height=Math.max(30,15*Math.ceil(Math.max(...d.xcols.map(x=>r[x.k].length/55),r.name.length/34,1)));
   });
   const lr=5+d.rows.length+1;ws.getCell(lr,1).value='Legend:';ws.getCell(lr,1).font={name:'Calibri',size:9,bold:true,color:{argb:muted}};
   Object.entries(GX_HEX).forEach(([st,hex],i)=>{const c=ws.getCell(lr,2+i);c.value=st;c.font={name:'Calibri',size:9,bold:true,color:{argb:'FFFFFFFF'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+hex}}});
   ws.getCell(lr+1,1).value=`Solid = completed share of the planned period. Red line = today (${fmt(TODAY)}).`;ws.getCell(lr+1,1).font={name:'Calibri',size:9,italic:true,color:{argb:muted}};
-  [36,13,12,12,12,9,13].forEach((w,i)=>ws.getColumn(i+1).width=w);per.forEach((p,i)=>ws.getColumn(fixed.length+1+i).width=d.weekly?7:6.5);ws.getColumn(remCol).width=48;
+  [36,13,12,12,12,9,13].forEach((w,i)=>ws.getColumn(i+1).width=w);per.forEach((p,i)=>ws.getColumn(fixed.length+1+i).width=d.weekly?7:6.5);d.xcols.forEach((x,xi)=>ws.getColumn(xc0+xi).width=48);
   // second sheet: plain data for filtering and pivots
-  const ds=wb.addWorksheet('Data');ds.columns=[{header:'Project',key:'name',width:40},{header:'Status',key:'status',width:13},{header:'PIC',key:'pic',width:14},{header:'Start',key:'start',width:12,style:{numFmt:'d mmm yyyy'}},{header:'Due',key:'due',width:12,style:{numFmt:'d mmm yyyy'}},{header:'Progress %',key:'pr',width:11},{header:'Overdue days',key:'od',width:13},{header:'Remarks / pain points',key:'remarks',width:60}];
+  const ds=wb.addWorksheet('Data');ds.columns=[{header:'Project',key:'name',width:40},{header:'Status',key:'status',width:13},{header:'PIC',key:'pic',width:14},{header:'Start',key:'start',width:12,style:{numFmt:'d mmm yyyy'}},{header:'Due',key:'due',width:12,style:{numFmt:'d mmm yyyy'}},{header:'Progress %',key:'pr',width:11},{header:'Overdue days',key:'od',width:13},{header:'Remarks / pain points',key:'remarks',width:60},{header:'Benefits',key:'benefit',width:60}];
   d.rows.forEach(r=>ds.addRow({...r,start:gxUtc(r.start),due:gxUtc(r.due),od:r.status==='Completed'?0:r.od}));
   ds.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};ds.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:navy}};
-  ds.autoFilter={from:'A1',to:'H1'};ds.views=[{state:'frozen',ySplit:1}];
+  ds.autoFilter={from:'A1',to:'I1'};ds.views=[{state:'frozen',ySplit:1}];
   const buf=await wb.xlsx.writeBuffer();gxSave(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),d.file+'.xlsx');toast('Excel file downloaded');
+}
+function ganttImportPick(){const f=document.createElement('input');f.type='file';f.accept='.xlsx';f.onchange=()=>{if(f.files[0])ganttImport(f.files[0])};f.click()}
+async function ganttImport(file){
+  try{await gxLib('xlsx')}catch(e){toast('Could not load the Excel tool. Check your internet connection and try again.',true);return}
+  let rows=[];
+  try{const wb=new ExcelJS.Workbook();await wb.xlsx.load(await file.arrayBuffer());
+    const ws=wb.getWorksheet('Data')||wb.worksheets[0];const head={};
+    ws.getRow(1).eachCell((c,i)=>{head[String(c.value||'').trim().toLowerCase()]=i});
+    const ci=k=>head[k],cp=ci('project'),cr=ci('remarks / pain points')||ci('remarks'),cb=ci('benefits')||ci('benefit')||ci('expected benefit');
+    if(!cp||(!cr&&!cb)){toast('The sheet needs a Project column and a Remarks / pain points or Benefits column.',true);return}
+    const txt=v=>{if(v==null)return'';if(typeof v==='object'&&v.richText)return v.richText.map(x=>x.text).join('');if(typeof v==='object'&&'result' in v)return String(v.result??'');return String(v)};
+    ws.eachRow((r,i)=>{if(i===1)return;rows.push({name:txt(r.getCell(cp).value).trim(),remarks:cr?txt(r.getCell(cr).value).replace(/​/g,'').trim():null,benefit:cb?txt(r.getCell(cb).value).replace(/​/g,'').trim():null})});
+  }catch(e){toast('Could not read that file: '+(e.message||e),true);return}
+  const norm=x=>String(x||'').toLowerCase().replace(/\s+/g,' ').trim();const byName=new Map(S.projects.map(p=>[norm(p.name),p]));
+  const changes=[],missing=[];
+  rows.filter(r=>r.name).forEach(r=>{const p=byName.get(norm(r.name));if(!p){missing.push(r.name);return}
+    const c={};if(r.remarks&&r.remarks!==(p.remarks||'').trim())c.remarks=r.remarks;if(r.benefit&&r.benefit!==(p.benefit||'').trim())c.benefit=r.benefit;
+    if(Object.keys(c).length)changes.push({p,c})});
+  if(!changes.length){toast(missing.length?`No changes. ${plural(missing.length,'project name')} not found.`:'Nothing to update. Remarks and benefits already match.');return}
+  confirmBox('Update remarks and benefits?',`<b>${plural(changes.length,'project')}</b> will be updated from <b>${esc(file.name)}</b>: ${changes.map(x=>esc(x.p.name)+' ('+Object.keys(x.c).map(k=>k==='benefit'?'benefit':'remarks').join(' & ')+')').join(', ')}.${missing.length?`<br><br>Not found, skipped: ${missing.map(esc).join(', ')}.`:''}`,'Update',async()=>{
+    for(const x of changes){const p=clone(x.p);Object.assign(p,x.c,{lastUpdated:TODAY});await Store.save('projects',p).catch(()=>{})}
+    toast(`Updated ${plural(changes.length,'project')}`)});
 }
 /* shared page layout for PDF and PowerPoint, in millimetres */
 function gxLayout(d,W,H,dr){
-  const m=10,nameW=Math.min(78,W*.24),remW=Math.min(72,W*.22),chartX=m+nameW,chartW=W-m*2-nameW-remW,remX=chartX+chartW;
+  const m=10,nx=d.xcols.length,nameW=Math.min(nx>1?64:78,W*(nx>1?.2:.24)),colW=nx?Math.min(nx>1?56:72,W*(nx>1?.17:.22)):0,chartX=m+nameW,chartW=W-m*2-nameW-colW*nx,remX=chartX+chartW;
   const headY=m+16,headH=7,rowH=10.5,top=headY+headH,maxRows=Math.max(1,Math.floor((H-top-m-8)/rowH));
   const span=Math.max(diffDays(d.from,d.to),1),X=t=>chartX+Math.min(1,Math.max(0,diffDays(d.from,t)/span))*chartW;
   const pages=[];for(let i=0;i<d.rows.length;i+=maxRows)pages.push(d.rows.slice(i,i+maxRows));
@@ -1846,9 +1873,9 @@ function gxLayout(d,W,H,dr){
     dr.text(d.stamp+(pages.length>1?` · page ${pi+1} of ${pages.length}`:''),m,m+8,W-2*m,5,{size:8.5,color:'5A6678'});
     dr.rect(m,headY,W-2*m,headH,'F5F7FA');
     dr.text('Project',m+2,headY,nameW-4,headH,{size:8,bold:true,color:'5A6678',valign:'middle'});
-    dr.text('Remarks / pain points',remX+2,headY,remW-4,headH,{size:8,bold:true,color:'5A6678',valign:'middle'});
-    d.ticks.forEach(([t,l])=>{const x=X(t);dr.line(x,headY,x,top+rows.length*rowH,'E1E6ED',.2);dr.text(l,x+.8,headY,22,headH,{size:d.ticks.length>14?6:7,color:'5A6678',valign:'middle'})});
-    dr.line(chartX,headY,chartX,top+rows.length*rowH,'C9D1DC',.3);dr.line(remX,headY,remX,top+rows.length*rowH,'C9D1DC',.3);
+    d.xcols.forEach((x,xi)=>dr.text(x.l,remX+colW*xi+2,headY,colW-4,headH,{size:8,bold:true,color:'5A6678',valign:'middle'}));
+    {let lastL=-99;const fs=d.ticks.length>14?6:7,need=fs*1.45;d.ticks.forEach(([t,l])=>{const x=X(t);dr.line(x,headY,x,top+rows.length*rowH,'E1E6ED',.2);if(x-lastL>=need&&x+need<=remX+1){dr.text(l,x+.8,headY,22,headH,{size:fs,color:'5A6678',valign:'middle'});lastL=x}})}
+    dr.line(chartX,headY,chartX,top+rows.length*rowH,'C9D1DC',.3);d.xcols.forEach((x,xi)=>dr.line(remX+colW*xi,headY,remX+colW*xi,top+rows.length*rowH,'C9D1DC',.3));
     rows.forEach((r,i)=>{const y=top+i*rowH;
       dr.line(m,y+rowH,W-m,y+rowH,'E1E6ED',.2);
       {const mx=Math.floor((nameW-4)/1.62);dr.text(r.name.length>mx?r.name.slice(0,mx-1).trimEnd()+'…':r.name,m+2,y+1,nameW-4,5,{size:8.5,bold:true,color:'172234',fit:1})}
@@ -1858,7 +1885,7 @@ function gxLayout(d,W,H,dr){
       dr.rect(x1,by,x2-x1,bh,gxTint(r.hex),{radius:1.2,line:gxTint(r.hex,.5)});
       const fw=(x2-x1)*Math.min(r.pr,100)/100;if(fw>.4)dr.rect(x1,by,fw,bh,r.hex,{radius:1.2});
       if(x2-x1>9)dr.text(r.pr+'%',x1+1,by,12,bh,{size:6.5,bold:true,color:r.pr>=12?'FFFFFF':'172234',valign:'middle'});
-      dr.text(r.remarks||'—',remX+2,y+.8,remW-4,rowH-1.6,{size:6.8,color:r.remarks?'172234':'8A94A3',fit:3});
+      d.xcols.forEach((x,xi)=>dr.text(r[x.k]||'—',remX+colW*xi+2,y+.8,colW-4,rowH-1.6,{size:nx>1?6.2:6.8,color:r[x.k]?x.hex:'8A94A3',fit:3}));
     });
     if(d.showToday){const x=X(TODAY);dr.line(x,headY,x,top+rows.length*rowH,'C0392B',.5)}
     let lx=m;const ly=Math.min(H-m-3,top+rows.length*rowH+4);
@@ -2148,7 +2175,7 @@ function loadingView(){return `<div class="skel" style="height:44px;width:min(38
 function renderMain(){
   const main=$('#main');const a=document.activeElement;let fid=null,sel=null;
   if(a&&a.id&&main.contains(a)){fid=a.id;try{sel=[a.selectionStart,a.selectionEnd]}catch(e){}}
-  const keep={};main.querySelectorAll('input[id],textarea[id]').forEach(x=>{if(x.type!=='date'&&x.type!=='search'&&!x.dataset.bind)keep[x.id]=x.value});
+  const keep={};main.querySelectorAll('input[id],textarea[id]').forEach(x=>{if(x.type!=='date'&&x.type!=='search'&&!x.dataset.bind&&!((x.dataset.grem||x.dataset.gben)&&x!==a))keep[x.id]=x.value});
   const banner=S.mode==='local'&&ready()?`<div class="banner">Standalone mode: changes are saved in this browser only. To share one set of data with your team, fill in config.js (see README).</div>`:'';
   const locked=S.mode==='firebase'&&S.auth.state!=='in';document.body.classList.toggle('locked',locked);
   if(locked){main.innerHTML=renderAuth();for(const k in keep){const x=document.getElementById(k);if(x&&x.type!=='password')x.value=keep[k]}if(fid)document.getElementById(fid)?.focus();else main.querySelector('input')?.focus();return}
@@ -2195,6 +2222,7 @@ document.addEventListener('click',async e=>{
     case 'remind-open':openRemind();break;
     case 'gw-fit':fitGanttNames();break;
     case 'g-export':{const dl=$('#gdl');if(dl)dl.open=false;ganttExport(t.dataset.k);break}
+    case 'g-import':{const dl=$('#gdl');if(dl)dl.open=false;ganttImportPick();break}
     case 'gw-reset':setGanttW(GW_DEF);break;
     case 'ent-clear':S.entity='';lsSet('dat-pm-entity','');refresh();break;
     case 'viz-pstatus':S.dash.focus=t.dataset.status;go('dashboard');break;
@@ -2273,6 +2301,8 @@ async function copy(txt){try{await navigator.clipboard.writeText(txt);toast('Cop
 document.addEventListener('change',async e=>{
   const t=e.target;const a=t.dataset.action;
   if(a==='g-rem'){lsSet('dat-pm-grem',t.checked?'1':'0');renderMain();return}
+  if(a==='g-ben'){lsSet('dat-pm-gben',t.checked?'1':'0');renderMain();return}
+  if(t.dataset.gben){const p0=projById(t.dataset.gben);if(!p0)return;const v=t.value.trim();if((p0.benefit||'')===v)return;const p=clone(p0);p.benefit=v;p.lastUpdated=TODAY;await Store.save('projects',p).then(()=>toast('Benefit saved')).catch(()=>{});return}
   if(t.dataset.grem){const p0=projById(t.dataset.grem);if(!p0)return;const v=t.value.trim();if((p0.remarks||'')===v)return;const p=clone(p0);p.remarks=v;p.lastUpdated=TODAY;await Store.save('projects',p).then(()=>toast('Remark saved')).catch(()=>{});return}
   if(a==='sub-status'){const s=clone(subById(t.dataset.id));s.status=t.value;if(t.value==='Completed'){s.progress=100;s.actualCompletionDate=s.actualCompletionDate||TODAY}else{s.actualCompletionDate='';if(Number(s.progress)>=100)s.progress=90}if(t.value==='Not Started'&&!s.progress)s.progress=0;await Store.save('subs',s).then(()=>toast('Status updated')).catch(()=>{});return}
   if(a==='sub-prog'){let v=Math.max(0,Math.min(100,Math.round(Number(t.value)||0)));const s=clone(subById(t.dataset.id));s.progress=v;
