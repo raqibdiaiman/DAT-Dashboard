@@ -412,6 +412,20 @@ select.ssel{appearance:none;-webkit-appearance:none;border:1px solid color-mix(i
 
 /* ===== Layout v3: vertical sidebar + top view tabs ===== */
 .ent-wrap[hidden]{display:none}
+.ent-wrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.areas{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:16px}
+.area-card{display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px;font:inherit;color:var(--ink);cursor:pointer}
+.area-card:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.area-card[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.area-card .t{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-weight:600}
+.area-card .t span{font-size:12.5px;color:var(--muted);font-weight:500}
+.area-card .n{font-size:26px;font-weight:700;letter-spacing:-.01em;line-height:1.1}
+.area-card .n small{font-size:12.5px;color:var(--muted);font-weight:500;margin-left:6px}
+.area-card .bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.area-card .bar i{display:block;height:100%;background:var(--accent)}
+.area-card .m{font-size:12.5px;color:var(--muted)}
+.area-card .m b{color:var(--s-late);font-weight:600}
+.area-tag{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
 .ent-sel{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 6px 4px 12px;box-shadow:var(--shadow);font-size:13px;color:var(--muted);font-weight:600}
 .ent-sel select{border:0;background:var(--surface-2);border-radius:7px;padding:7px 8px;font-weight:600;color:var(--ink);font-size:14px}
 .ent-sel.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
@@ -852,10 +866,13 @@ const issueById=id=>S.issues.find(i=>i.id===id);
    sub-projects and their progress is recalculated from those. */
 const DEFAULT_ENTITIES=['MRE','TIFB','TIGB','SSB','MSSB','LRE'];
 S.entity=lsGet('dat-pm-entity','')||'';S.entities=null;
+const AREA_LABEL='Business area',AREAS=['Finance','Non-Finance'];S.area=lsGet('dat-pm-area','')||'';
+const inArea=p=>!S.area||(S.area==='__none'?!p.area:p.area===S.area);
 const entityList=()=>(S.entities&&S.entities.length?S.entities:DEFAULT_ENTITIES);
 const subsAll=pid=>S.subs.filter(s=>s.projectId===pid).sort((a,b)=>(a.order??0)-(b.order??0)||(a.startDate||'').localeCompare(b.startDate||''));
 const inEntity=s=>!S.entity||(s.entity||'')===S.entity;
-const inScope=p=>!S.entity||subsAll(p.id).some(inEntity);
+const inEntScope=p=>!S.entity||subsAll(p.id).some(inEntity);
+const inScope=p=>inEntScope(p)&&inArea(p);
 const activeProjects=()=>S.projects.filter(p=>!p.archived&&inScope(p)).sort((a,b)=>(a.order??0)-(b.order??0)||(a.createdDate||'').localeCompare(b.createdDate||''));
 const archivedProjects=()=>S.projects.filter(p=>p.archived).sort((a,b)=>a.name.localeCompare(b.name));
 const subsOf=pid=>subsAll(pid).filter(inEntity);
@@ -934,7 +951,7 @@ function renderTabs(){
     </nav>
     <div class="side-foot"><button class="sfoot" data-action="team-modal">Team directory</button>${S.mode!=='db'?`<button class="sfoot" data-action="backups">Backups</button>`:''}</div>`;
   const labels=area==='projects'?[['dashboard','Summary',NAVICON.sum],['pviz','Visualisation',NAVICON.viz],['gantt','Gantt chart',NAVICON.gantt]]:[['bau','Summary',NAVICON.sum],['bviz','Visualisation',NAVICON.viz],['bgantt','Gantt chart',NAVICON.gantt]];
-  const es=$('#entWrap');if(es){es.hidden=area!=='projects';if(area==='projects')es.innerHTML=`<label class="ent-sel ${S.entity?'on':''}"><span>Entity</span><select id="entSel" aria-label="Filter by entity"><option value="">All entities</option>${entityList().map(e=>`<option ${e===S.entity?'selected':''}>${esc(e)}</option>`).join('')}<option value="__manage">Edit entity list…</option></select></label>`}
+  const es=$('#entWrap');if(es){es.hidden=area!=='projects';if(area==='projects')es.innerHTML=`<label class="ent-sel ${S.entity?'on':''}"><span>Entity</span><select id="entSel" aria-label="Filter by entity"><option value="">All entities</option>${entityList().map(e=>`<option ${e===S.entity?'selected':''}>${esc(e)}</option>`).join('')}<option value="__manage">Edit entity list…</option></select></label><label class="ent-sel ${S.area?'on':''}"><span>${AREA_LABEL}</span><select id="areaSel" aria-label="Filter by ${AREA_LABEL.toLowerCase()}"><option value="">All areas</option>${AREAS.map(a=>`<option ${a===S.area?'selected':''}>${a}</option>`).join('')}${S.projects.some(p=>!p.archived&&!p.area)?`<option value="__none" ${S.area==='__none'?'selected':''}>Not set</option>`:''}</select></label>`}
   $('#tabs').innerHTML=labels.map(([k,l,ic])=>`<button class="ttab ${v===k?'active':''}" data-nav="${k}" ${v===k?'aria-current="page"':''}>${ic}<span>${l}</span></button>`).join('');
   const cur=area==='projects'?(v.startsWith('p:')?projById(v.slice(2))?.name:v==='add'?'New project':''):(v.startsWith('g:')?groupById(v.slice(2))?.name:v==='bauchk'?'Checklist':'');
   $('#tbTitle').innerHTML=`<span class="tb-area">${area==='projects'?'Projects':'BAU'}</span>${cur?`<span class="tb-cur">${esc(cur)}</span>`:''}`;
@@ -1645,6 +1662,17 @@ document.addEventListener('dblclick',e=>{if(e.target.closest('[data-gresize]'))s
 document.addEventListener('keydown',e=>{if(!e.target.matches?.('[data-gresize]'))return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setGanttW(ganttW()+(e.key==='ArrowRight'?20:-20))}});
 document.addEventListener('input',e=>{if(e.target.id==='gw-range')setGanttW(Number(e.target.value))});
 function fitGanttNames(){const bs=[...document.querySelectorAll('.gantt .g-name b')];if(!bs.length)return;const c=document.createElement('canvas').getContext('2d');const cs=getComputedStyle(bs[0]);c.font=`${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;const w=Math.max(...bs.map(b=>c.measureText(b.textContent).width));setGanttW(w+60)}
+function areaPanel(){
+  const all=S.projects.filter(p=>!p.archived&&inEntScope(p));if(!all.length)return '';
+  const groups=[...AREAS.map(a=>[a,a,all.filter(p=>p.area===a)]),['__none','Not set',all.filter(p=>!p.area)]].filter(([k,,ps])=>ps.length||k!=='__none');
+  return `<section class="areas" aria-label="Progress by ${AREA_LABEL.toLowerCase()}">${groups.map(([k,l,ps])=>{const n=ps.length,pr=n?Math.round(ps.reduce((a,p)=>a+progressOf(p),0)/n):0;
+    const done=ps.filter(p=>p.status==='Completed').length,od=ps.filter(p=>projOverdue(p)&&p.status!=='Completed').length;
+    return `<button class="area-card" data-action="area-pick" data-k="${k}" aria-pressed="${S.area===k}" title="${S.area===k?'Show all areas':'Show '+esc(l)+' projects only'}">
+      <span class="t">${esc(l)}<span>${plural(n,'project')}</span></span>
+      <span class="n">${pr}%<small>average completion</small></span>
+      <span class="bar"><i style="width:${pr}%"></i></span>
+      <span class="m">${done} completed · ${n-done} active${od?` · <b>${od} past due</b>`:''}</span></button>`}).join('')}</section>`;
+}
 function renderDashboard(){
   const ps=activeProjects();const rows=ps.map(p=>({p,prog:progressOf(p),od:projOverdue(p)}));
   const n=rows.length;const c=countBy(rows,r=>r.p.status);
@@ -1663,6 +1691,7 @@ function renderDashboard(){
   <header class="page-h"><div><h1>DAT portfolio dashboard</h1><p class="sub">${plural(n,'active project')} as at ${fmt(TODAY)}. Every figure here is calculated from the project tabs.</p></div>
   <span style="display:flex;gap:8px;flex-wrap:wrap">${S.mode!=='db'?`<button class="btn" data-action="backups">Backups</button><button class="btn" data-action="backup">Download backup</button>`:''}<button class="btn" data-action="copy-portfolio">${ICON.copy}Copy portfolio summary</button></span></header>
   ${!n?`<div class="panel">${emptyState('No projects yet','Create your first DAT project. It will get its own tab and appear here automatically.',`<button class="btn primary" data-nav="add">${ICON.plus}Add project</button>`)}</div>`:`
+  ${areaPanel()}
   <section class="kpis" aria-label="Portfolio figures">
     ${kpi('Total DAT projects',n,'Active projects','var(--nav)')}
     ${kpi('Average completion',Math.round(avg)+'%','Across active projects','var(--accent)')}
@@ -1743,7 +1772,7 @@ function renderGantt(){
       <button role="menuitem" data-action="g-export" data-k="xlsx">Excel (.xlsx)<small>Coloured Gantt grid, editable data</small></button>
       <button role="menuitem" data-action="g-export" data-k="pdf">PDF<small>Landscape A4, ready to print or email</small></button>
       <button role="menuitem" data-action="g-export" data-k="pptx">PowerPoint (.pptx)<small>Editable slides for meetings</small></button>
-      <button role="menuitem" data-action="g-import" style="border-top:1px solid var(--line);border-radius:0 0 7px 7px;margin-top:4px">Update from Excel…<small>Load remarks and benefits from the Data sheet</small></button>
+      <button role="menuitem" data-action="g-import" style="border-top:1px solid var(--line);border-radius:0 0 7px 7px;margin-top:4px">Update from Excel…<small>Load remarks, benefits and ${AREA_LABEL.toLowerCase()} from the Data sheet</small></button>
     </div></details>`:''}</header>
   <section class="filterbar" aria-label="Gantt filters">
     <div class="chips" role="group" aria-label="Quick range">${presets.map(([k,l])=>`<button class="chip" data-action="g-preset" data-k="${k}" aria-pressed="${g.preset===k}">${l}</button>`).join('')}</div>
@@ -1753,13 +1782,14 @@ function renderGantt(){
     <label class="f">PIC<select class="inp" id="g-pic" data-bind="gantt.pic">${opts(uniq(activeProjects().map(p=>p.pic)),g.pic,'All PICs')}</select></label>
     ${(g.from||g.to||g.status||g.pic)?`<button class="btn ghost" data-action="g-reset">Clear</button>`:''}
   </section>
+  ${areaPanel()}
   <section class="panel flush">
     ${!ps.length?emptyState('No projects to chart','Projects need a start and due date to appear on the Gantt.'):!rows.length?emptyState('No projects in this range','Widen the dates or clear a filter.',`<button class="btn" data-action="g-reset">Clear filters</button>`):`
     ${ganttTools(true)}<div class="tw"><div class="gantt ${ganttWrap()?'wrap':''} ${nx?'has-x':''}" style="--gname-w:${ganttW()}px;${nx?`--gcols:var(--gname-w) 1fr${' '+GX_COLW+'px'}${nx>1?' '+GX_COLW+'px':''};min-width:calc(${ganttW()}px + ${440+GX_COLW*nx}px)`:''}">
       <div class="g-head"><div class="g-label"><span class="g-resize" data-gresize title="Drag to resize the name column (double-click to reset)" role="separator" aria-orientation="vertical" aria-label="Resize name column" tabindex="0"></span>Project · ${fmt(from)} – ${fmt(to)}</div><div class="g-scale">${ticks.map(([d,l])=>`<span style="left:${pos(d)}%">${l}</span>`).join('')}</div>${rem?`<div class="g-remh">Remarks / pain points</div>`:''}${ben?`<div class="g-remh">Benefits</div>`:''}</div>
       ${rows.map(p=>{const pr=progressOf(p),od=projOverdue(p);const l=pos(p.startDate),r=pos(p.dueDate);const w=Math.max(r-l,0.8);
         return `<div class="g-row" data-nav="p:${p.id}" role="link" tabindex="0" aria-label="${esc(p.name)}, ${fmt(p.startDate)} to ${fmt(p.dueDate)}, ${Math.round(pr)}% complete, ${esc(p.status)}">
-          <div class="g-name"><b title="${esc(p.name)}">${esc(p.name)}</b><div class="small" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${badge(p.status)}<span>${Math.round(pr)}%</span>${od?`<span class="warn" title="System deadline warning">${ICON.warn}${od}d</span>`:''}</div></div>
+          <div class="g-name"><b title="${esc(p.name)}">${esc(p.name)}</b><div class="small" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${badge(p.status)}<span>${Math.round(pr)}%</span>${od?`<span class="warn" title="System deadline warning">${ICON.warn}${od}d</span>`:''}${p.area&&!S.area?`<span class="area-tag">${esc(p.area)}</span>`:''}</div></div>
           <div class="g-track">${ticks.map(([d])=>`<span class="g-grid" style="left:${pos(d)}%"></span>`).join('')}
             <div class="g-bar ${p.startDate<from?'cut-l':''} ${p.dueDate>to?'cut-r':''}" style="left:${l}%;width:${w}%;--c:var(--s-${SCLS[p.status]})" title="${esc(p.name)}: ${fmt(p.startDate)} – ${fmt(p.dueDate)} · ${Math.round(pr)}% · ${esc(p.status)}"><i style="width:${Math.min(pr,100)}%"></i>${w>6?`<em ${pr<12?'style="color:var(--ink);text-shadow:none"':''}>${Math.round(pr)}%</em>`:''}</div>
             ${showToday?`<span class="g-today" style="left:${pos(TODAY)}%"></span>`:''}
@@ -1780,11 +1810,11 @@ const gxUtc=t=>{const [y,m,d]=t.split('-').map(Number);return new Date(Date.UTC(
 const gxTint=(hex,a=.22)=>{const n=parseInt(hex,16),r=n>>16,g=n>>8&255,b=n&255,m=c=>Math.round(c*a+255*(1-a)).toString(16).padStart(2,'0');return (m(r)+m(g)+m(b)).toUpperCase()};
 function gxData(){
   const M=ganttModel(true);const g=M.g;
-  const filt=[g.status&&`Status: ${g.status}`,g.pic&&`PIC: ${g.pic}`].filter(Boolean).join(' · ');
+  const filt=[S.area&&`${AREA_LABEL}: ${S.area==='__none'?'Not set':S.area}`,g.status&&`Status: ${g.status}`,g.pic&&`PIC: ${g.pic}`].filter(Boolean).join(' · ');
   const rows=M.rows.map(p=>{const pr=Math.round(progressOf(p)),od=projOverdue(p);
     return {name:p.name,status:p.status,pic:p.pic||'',start:p.startDate,due:p.dueDate,pr,od,
       sched:p.status==='Completed'?'Completed':od?`Overdue ${od}d`:`${Math.max(0,diffDays(TODAY,p.dueDate))}d left`,
-      remarks:(p.remarks||'').trim(),benefit:(p.benefit||'').trim(),hex:GX_HEX[p.status]||GX_HEX['Not Started']}});
+      area:p.area||'',remarks:(p.remarks||'').trim(),benefit:(p.benefit||'').trim(),hex:GX_HEX[p.status]||GX_HEX['Not Started']}});
   const xcols=[ganttRem()&&{k:'remarks',l:'Remarks / pain points',hex:'172234'},ganttBen()&&{k:'benefit',l:'Benefits',hex:'1F5A38'}].filter(Boolean);
   return {...M,rows,filt,xcols,stamp:`${fmt(M.from)} – ${fmt(M.to)}${filt?' · '+filt:''} · as at ${fmt(TODAY)}`,
     file:`DAT_Gantt_${TODAY}`};
@@ -1799,10 +1829,10 @@ async function ganttExport(k){
 }
 async function gxExcel(d){
   const wb=new ExcelJS.Workbook();wb.creator='DAT Monitoring';wb.created=new Date();
-  const ws=wb.addWorksheet('Gantt',{views:[{state:'frozen',xSplit:7,ySplit:4,showGridLines:false}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
+  const ws=wb.addWorksheet('Gantt',{views:[{state:'frozen',xSplit:8,ySplit:4,showGridLines:false}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
   // periods = one column per tick (month, quarter step or week)
   const per=d.ticks.map(([s],i)=>{const e=i+1<d.ticks.length?iso(new Date(parse(d.ticks[i+1][0]).getTime()-864e5)):d.to;return {s,e,l:d.ticks[i][1]}});
-  const fixed=['Project','Status','PIC','Start','Due','Progress','Schedule'];
+  const fixed=['Project','Status','PIC','Start','Due','Progress','Schedule',AREA_LABEL];
   const nCols=fixed.length+per.length+d.xcols.length;const xc0=fixed.length+per.length+1;
   const navy='FF14223D',line='FFE1E6ED',muted='FF5A6678';
   ws.getCell(1,1).value='DAT Overall Gantt';ws.getCell(1,1).font={name:'Calibri',size:16,bold:true,color:{argb:navy}};
@@ -1814,7 +1844,7 @@ async function gxExcel(d){
   const todayIdx=per.findIndex(p=>TODAY>=p.s&&TODAY<=p.e);
   d.rows.forEach((r,ri)=>{const row=ws.getRow(5+ri);const span=Math.max(diffDays(r.start,r.due),1);
     const doneTo=iso(new Date(parse(r.start).getTime()+span*r.pr/100*864e5));
-    const vals=[r.name,r.status,r.pic,gxUtc(r.start),gxUtc(r.due),r.pr/100,r.sched];
+    const vals=[r.name,r.status,r.pic,gxUtc(r.start),gxUtc(r.due),r.pr/100,r.sched,r.area||'Not set'];
     vals.forEach((v,i)=>{const c=row.getCell(i+1);c.value=v;c.font={name:'Calibri',size:10,bold:i===0,color:{argb:i===6&&r.od&&r.status!=='Completed'?'FFC0392B':'FF172234'}};
       c.alignment={vertical:'middle',wrapText:i===0};if(i===3||i===4)c.numFmt='d mmm yyyy';if(i===5)c.numFmt='0%'});
     row.getCell(2).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+gxTint(r.hex,.18)}};row.getCell(2).font={name:'Calibri',size:10,bold:true,color:{argb:'FF'+r.hex}};
@@ -1832,12 +1862,18 @@ async function gxExcel(d){
   const lr=5+d.rows.length+1;ws.getCell(lr,1).value='Legend:';ws.getCell(lr,1).font={name:'Calibri',size:9,bold:true,color:{argb:muted}};
   Object.entries(GX_HEX).forEach(([st,hex],i)=>{const c=ws.getCell(lr,2+i);c.value=st;c.font={name:'Calibri',size:9,bold:true,color:{argb:'FFFFFFFF'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+hex}}});
   ws.getCell(lr+1,1).value=`Solid = completed share of the planned period. Red line = today (${fmt(TODAY)}).`;ws.getCell(lr+1,1).font={name:'Calibri',size:9,italic:true,color:{argb:muted}};
-  [36,13,12,12,12,9,13].forEach((w,i)=>ws.getColumn(i+1).width=w);per.forEach((p,i)=>ws.getColumn(fixed.length+1+i).width=d.weekly?7:6.5);d.xcols.forEach((x,xi)=>ws.getColumn(xc0+xi).width=48);
+  [36,13,12,12,12,9,13,14].forEach((w,i)=>ws.getColumn(i+1).width=w);per.forEach((p,i)=>ws.getColumn(fixed.length+1+i).width=d.weekly?7:6.5);d.xcols.forEach((x,xi)=>ws.getColumn(xc0+xi).width=48);
   // second sheet: plain data for filtering and pivots
-  const ds=wb.addWorksheet('Data');ds.columns=[{header:'Project',key:'name',width:40},{header:'Status',key:'status',width:13},{header:'PIC',key:'pic',width:14},{header:'Start',key:'start',width:12,style:{numFmt:'d mmm yyyy'}},{header:'Due',key:'due',width:12,style:{numFmt:'d mmm yyyy'}},{header:'Progress %',key:'pr',width:11},{header:'Overdue days',key:'od',width:13},{header:'Remarks / pain points',key:'remarks',width:60},{header:'Benefits',key:'benefit',width:60}];
-  d.rows.forEach(r=>ds.addRow({...r,start:gxUtc(r.start),due:gxUtc(r.due),od:r.status==='Completed'?0:r.od}));
+  const ds=wb.addWorksheet('Data');ds.columns=[{header:'Project',key:'name',width:40},{header:'Status',key:'status',width:13},{header:'PIC',key:'pic',width:14},{header:AREA_LABEL,key:'area',width:14},{header:'Start',key:'start',width:12,style:{numFmt:'d mmm yyyy'}},{header:'Due',key:'due',width:12,style:{numFmt:'d mmm yyyy'}},{header:'Progress %',key:'pr',width:11},{header:'Overdue days',key:'od',width:13},{header:'Remarks / pain points',key:'remarks',width:60},{header:'Benefits',key:'benefit',width:60}];
+  d.rows.forEach(r=>ds.addRow({...r,area:r.area||'Not set',start:gxUtc(r.start),due:gxUtc(r.due),od:r.status==='Completed'?0:r.od}));
+  // third sheet: progress by business area
+  const as=wb.addWorksheet('By '+AREA_LABEL.toLowerCase());as.columns=[{header:AREA_LABEL,key:'a',width:18},{header:'Projects',key:'n',width:10},{header:'Average completion',key:'pr',width:18,style:{numFmt:'0%'}},{header:'Completed',key:'done',width:11},{header:'In progress',key:'ip',width:11},{header:'Delayed',key:'dl',width:10},{header:'Not started',key:'ns',width:11},{header:'Past due',key:'od',width:10}];
+  [...AREAS,'Not set'].forEach(a=>{const rs=d.rows.filter(r=>(r.area||'Not set')===a);if(!rs.length)return;const c=st=>rs.filter(r=>r.status===st).length;
+    as.addRow({a,n:rs.length,pr:rs.reduce((x,r)=>x+r.pr,0)/rs.length/100,done:c('Completed'),ip:c('In Progress'),dl:c('Delayed'),ns:c('Not Started'),od:rs.filter(r=>r.od&&r.status!=='Completed').length})});
+  as.addRow({a:'All',n:d.rows.length,pr:d.rows.reduce((x,r)=>x+r.pr,0)/Math.max(1,d.rows.length)/100,done:d.rows.filter(r=>r.status==='Completed').length,ip:d.rows.filter(r=>r.status==='In Progress').length,dl:d.rows.filter(r=>r.status==='Delayed').length,ns:d.rows.filter(r=>r.status==='Not Started').length,od:d.rows.filter(r=>r.od&&r.status!=='Completed').length}).font={bold:true};
+  as.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};as.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:navy}};
   ds.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};ds.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:navy}};
-  ds.autoFilter={from:'A1',to:'I1'};ds.views=[{state:'frozen',ySplit:1}];
+  ds.autoFilter={from:'A1',to:'J1'};ds.views=[{state:'frozen',ySplit:1}];
   const buf=await wb.xlsx.writeBuffer();gxSave(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),d.file+'.xlsx');toast('Excel file downloaded');
 }
 function ganttImportPick(){const f=document.createElement('input');f.type='file';f.accept='.xlsx';f.onchange=()=>{if(f.files[0])ganttImport(f.files[0])};f.click()}
@@ -1847,18 +1883,18 @@ async function ganttImport(file){
   try{const wb=new ExcelJS.Workbook();await wb.xlsx.load(await file.arrayBuffer());
     const ws=wb.getWorksheet('Data')||wb.worksheets[0];const head={};
     ws.getRow(1).eachCell((c,i)=>{head[String(c.value||'').trim().toLowerCase()]=i});
-    const ci=k=>head[k],cp=ci('project'),cr=ci('remarks / pain points')||ci('remarks'),cb=ci('benefits')||ci('benefit')||ci('expected benefit');
-    if(!cp||(!cr&&!cb)){toast('The sheet needs a Project column and a Remarks / pain points or Benefits column.',true);return}
+    const ci=k=>head[k],cp=ci('project'),cr=ci('remarks / pain points')||ci('remarks'),cb=ci('benefits')||ci('benefit')||ci('expected benefit'),ca=ci(AREA_LABEL.toLowerCase())||ci('project section')||ci('section');
+    if(!cp||(!cr&&!cb&&!ca)){toast(`The sheet needs a Project column and a Remarks / pain points, Benefits or ${AREA_LABEL} column.`,true);return}
     const txt=v=>{if(v==null)return'';if(typeof v==='object'&&v.richText)return v.richText.map(x=>x.text).join('');if(typeof v==='object'&&'result' in v)return String(v.result??'');return String(v)};
-    ws.eachRow((r,i)=>{if(i===1)return;rows.push({name:txt(r.getCell(cp).value).trim(),remarks:cr?txt(r.getCell(cr).value).replace(/​/g,'').trim():null,benefit:cb?txt(r.getCell(cb).value).replace(/​/g,'').trim():null})});
+    ws.eachRow((r,i)=>{if(i===1)return;rows.push({name:txt(r.getCell(cp).value).trim(),remarks:cr?txt(r.getCell(cr).value).replace(/​/g,'').trim():null,benefit:cb?txt(r.getCell(cb).value).replace(/​/g,'').trim():null,area:ca?(v=>v.startsWith('non')?'Non-Finance':v.startsWith('fin')?'Finance':'')(txt(r.getCell(ca).value).trim().toLowerCase()):''})});
   }catch(e){toast('Could not read that file: '+(e.message||e),true);return}
   const norm=x=>String(x||'').toLowerCase().replace(/\s+/g,' ').trim();const byName=new Map(S.projects.map(p=>[norm(p.name),p]));
   const changes=[],missing=[];
   rows.filter(r=>r.name).forEach(r=>{const p=byName.get(norm(r.name));if(!p){missing.push(r.name);return}
-    const c={};if(r.remarks&&r.remarks!==(p.remarks||'').trim())c.remarks=r.remarks;if(r.benefit&&r.benefit!==(p.benefit||'').trim())c.benefit=r.benefit;
+    const c={};if(r.remarks&&r.remarks!==(p.remarks||'').trim())c.remarks=r.remarks;if(r.benefit&&r.benefit!==(p.benefit||'').trim())c.benefit=r.benefit;if(r.area&&r.area!==(p.area||''))c.area=r.area;
     if(Object.keys(c).length)changes.push({p,c})});
   if(!changes.length){toast(missing.length?`No changes. ${plural(missing.length,'project name')} not found.`:'Nothing to update. Remarks and benefits already match.');return}
-  confirmBox('Update remarks and benefits?',`<b>${plural(changes.length,'project')}</b> will be updated from <b>${esc(file.name)}</b>: ${changes.map(x=>esc(x.p.name)+' ('+Object.keys(x.c).map(k=>k==='benefit'?'benefit':'remarks').join(' & ')+')').join(', ')}.${missing.length?`<br><br>Not found, skipped: ${missing.map(esc).join(', ')}.`:''}`,'Update',async()=>{
+  confirmBox('Update projects from Excel?',`<b>${plural(changes.length,'project')}</b> will be updated from <b>${esc(file.name)}</b>: ${changes.map(x=>esc(x.p.name)+' ('+Object.keys(x.c).map(k=>k==='area'?AREA_LABEL.toLowerCase():k==='benefit'?'benefit':'remarks').join(' & ')+')').join(', ')}.${missing.length?`<br><br>Not found, skipped: ${missing.map(esc).join(', ')}.`:''}`,'Update',async()=>{
     for(const x of changes){const p=clone(x.p);Object.assign(p,x.c,{lastUpdated:TODAY});await Store.save('projects',p).catch(()=>{})}
     toast(`Updated ${plural(changes.length,'project')}`)});
 }
@@ -1880,7 +1916,7 @@ function gxLayout(d,W,H,dr){
       dr.line(m,y+rowH,W-m,y+rowH,'E1E6ED',.2);
       {const mx=Math.floor((nameW-4)/1.62);dr.text(r.name.length>mx?r.name.slice(0,mx-1).trimEnd()+'…':r.name,m+2,y+1,nameW-4,5,{size:8.5,bold:true,color:'172234',fit:1})}
       dr.rect(m+2,y+6.2,18,3.4,gxTint(r.hex,.18),{radius:1.7});dr.text(r.status,m+2,y+6.2,18,3.4,{size:6,bold:true,color:r.hex,align:'center',valign:'middle'});
-      dr.text(`${r.pr}%  ·  ${r.pic}${r.od&&r.status!=='Completed'?`  ·  ${r.od}d late`:''}`,m+22,y+6.2,nameW-24,3.4,{size:6.5,color:r.od&&r.status!=='Completed'?'C0392B':'5A6678',valign:'middle'});
+      dr.text(`${r.pr}%  ·  ${r.pic}${r.area?`  ·  ${r.area}`:''}${r.od&&r.status!=='Completed'?`  ·  ${r.od}d late`:''}`,m+22,y+6.2,nameW-24,3.4,{size:6.5,color:r.od&&r.status!=='Completed'?'C0392B':'5A6678',valign:'middle'});
       const x1=X(r.start),x2=Math.max(X(r.due),x1+1.2),bh=4.6,by=y+(rowH-bh)/2;
       dr.rect(x1,by,x2-x1,bh,gxTint(r.hex),{radius:1.2,line:gxTint(r.hex,.5)});
       const fw=(x2-x1)*Math.min(r.pr,100)/100;if(fw>.4)dr.rect(x1,by,fw,bh,r.hex,{radius:1.2});
@@ -1945,6 +1981,7 @@ function renderProject(p){
         <div><dt>Start date</dt><dd>${fmt(p.startDate)}</dd></div>
         <div><dt>Expected completion</dt><dd>${fmt(p.dueDate)}</dd></div>
         <div><dt>Actual completion</dt><dd>${fmt(p.actualCompletionDate)}</dd></div>
+        <div><dt>${AREA_LABEL}</dt><dd>${esc(p.area||'Not set')}</dd></div>
         <div><dt>Schedule</dt><dd>${schedHTML(projSched(p,prog))}</dd></div>
         <div><dt>Last updated</dt><dd>${fmt(lastUpdatedOf(p))}</dd></div>
       </dl>
@@ -2064,6 +2101,7 @@ function projectFields(v,isNew){
         <div class="manualp range" ${v.progressMode==='manual'?'':'hidden'}><input type="range" name="manualProgress" min="0" max="100" step="5" value="${Number(v.manualProgress)||0}" oninput="this.nextElementSibling.value=this.value+'%'" aria-label="Manual progress"><output>${Number(v.manualProgress)||0}%</output></div>
       </div>
     </div>
+    <label class="f" style="max-width:320px">${AREA_LABEL}<select class="inp" name="area"><option value="">Not set</option>${AREAS.map(a=>`<option ${a===(v.area||'')?'selected':''}>${a}</option>`).join('')}</select><span class="hint">Used for the ${AREA_LABEL.toLowerCase()} filter and progress cards.</span></label>
     <label class="f">Overall objective<textarea class="inp" name="objective" rows="2">${esc(v.objective)}</textarea></label>
     <label class="f">Expected benefit<textarea class="inp" name="benefit" rows="2" placeholder="e.g. Saves 2–3 working days per reporting cycle">${esc(v.benefit)}</textarea></label>
     ${isNew?'':`<label class="f">Project summary — overall remarks<textarea class="inp" name="overallRemarks" rows="2">${esc(v.summary?.overallRemarks)}</textarea></label>`}
@@ -2084,7 +2122,7 @@ function readProjectForm(f,base){
   if(S.projects.some(p=>p.id!==base?.id&&p.name.trim().toLowerCase()===g('name').toLowerCase())){mark(f.name,'A project with this name already exists');good=false}
   if(!good)return null;
   const p=base?clone(base):{id:uid('p'),createdDate:TODAY,archived:false,order:Date.now(),summary:{achievements:[],nextActions:[],overallRemarks:''}};
-  Object.assign(p,{name:g('name'),description:g('description'),pic:g('pic'),startDate:g('startDate'),dueDate:g('dueDate'),actualCompletionDate:g('status')==='Completed'?(g('actualCompletionDate')||TODAY):'',status:g('status'),progressMode:g('progressMode')||'auto',manualProgress:Number(fd.get('manualProgress')||0),objective:g('objective'),benefit:g('benefit'),remarks:g('remarks')});
+  Object.assign(p,{name:g('name'),description:g('description'),pic:g('pic'),startDate:g('startDate'),dueDate:g('dueDate'),actualCompletionDate:g('status')==='Completed'?(g('actualCompletionDate')||TODAY):'',status:g('status'),progressMode:g('progressMode')||'auto',manualProgress:Number(fd.get('manualProgress')||0),objective:g('objective'),benefit:g('benefit'),area:g('area'),remarks:g('remarks')});
   if(fd.has('overallRemarks')){p.summary=p.summary||{};p.summary.overallRemarks=g('overallRemarks')}
   return p;
 }
@@ -2221,6 +2259,7 @@ document.addEventListener('click',async e=>{
     case 'close-modal':closeModal();break;
     case 'remind-open':openRemind();break;
     case 'gw-fit':fitGanttNames();break;
+    case 'area-pick':{const k=t.dataset.k;S.area=S.area===k?'':k;lsSet('dat-pm-area',S.area);refresh();break}
     case 'g-export':{const dl=$('#gdl');if(dl)dl.open=false;ganttExport(t.dataset.k);break}
     case 'g-import':{const dl=$('#gdl');if(dl)dl.open=false;ganttImportPick();break}
     case 'gw-reset':setGanttW(GW_DEF);break;
@@ -2312,6 +2351,7 @@ document.addEventListener('change',async e=>{
   if(a==='issue-status'){const i=issueById(t.dataset.id);if(t.value==='Resolved'&&!i.resolution){t.value=i.status;issueModal({id:i.id});setTimeout(()=>{const f=$('#mform');if(f){f.status.value='Resolved';f.actualDate.value=f.actualDate.value||TODAY;f.resolution.focus()}},40);return}
     const q=clone(i);q.status=t.value;if(t.value==='Resolved')q.actualDate=q.actualDate||TODAY;else q.actualDate='';await Store.save('issues',q).then(()=>toast('Issue updated')).catch(()=>{});return}
   if(a==='bau-done'||a==='bau-status'){const bt=bauTaskById(t.dataset.t);if(!bt)return;const status=a==='bau-done'?(t.checked?(bt.reviewer?'Pending Review':'Completed'):'Not Started'):t.value;if(blockIfOpen(bt,status)){if(a==='bau-done')t.checked=false;else t.value=bt.status||'Not Started';return}await saveTaskPatch(bt,{status}).then(()=>toast(status==='Completed'?'Marked completed':status==='Pending Review'?'Sent for review':'Status updated')).catch(()=>{});return}
+  if(t.id==='areaSel'){S.area=t.value;lsSet('dat-pm-area',S.area);refresh();toast(S.area?`Showing ${S.area==='__none'?'projects with no '+AREA_LABEL.toLowerCase():S.area+' projects'} only`:'Showing all areas');return}
   if(t.id==='entSel'){if(t.value==='__manage'){t.value=S.entity;entityModal();return}S.entity=t.value;lsSet('dat-pm-entity',S.entity);refresh();toast(S.entity?`Showing ${S.entity} only`:'Showing all entities');return}
   if(a==='gw-wrap'){lsSet('dat-pm-gantt-wrap',t.checked?'1':'');document.querySelectorAll('.gantt').forEach(g=>g.classList.toggle('wrap',t.checked));return}
   if(t.id==='rp-who'){S.remind.who=t.value;renderRemindPanel();return}
